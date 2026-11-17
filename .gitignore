@@ -1,0 +1,50 @@
+# Maven and local validation tooling
+/target/
+/.tools/
+/.m2/
+*.class
+*.jar
+
+# Credentials and machine-local configuration
+.env
+.env.*
+!.env.example
+/credentials/
+/secrets/
+.aws/
+.ssh/
+settings.xml
+settings-security.xml
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+
+# Local SQLite databases and their journal/WAL files
+*.db
+*.db-*
+*.sqlite
+*.sqlite-*
+*.sqlite3
+*.sqlite3-*
+
+# Editors and operating-system temporary files
+.idea/
+*.iml
+.vscode/
+.classpath
+.project
+.settings/
+/out/
+*.swp
+*.swo
+*~
+*.tmp
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# JVM crash reports; keep source log fixtures eligible for version control
+hs_err_pid*.log
+replay_pid*.log
