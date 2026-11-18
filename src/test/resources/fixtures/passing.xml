@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="synthetic.passing" tests="2" failures="0" errors="0" skipped="0">
+  <testcase classname="example.SampleTest" name="passesImmediately" time="0"/>
+  <testcase name="passesWithoutClassMetadata" time="0.025"/>
+</testsuite>

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="synthetic.checkout" tests="5" failures="1" errors="1" skipped="1">
+  <properties>
+    <property name="fixture.kind" value="invented data; no production evidence"/>
+  </properties>
+  <testcase classname="example.CheckoutTest" name="acceptsEmptyCart" time="0"/>
+  <testcase classname="example.CheckoutTest" name="acceptsValidCart" time="0.025"/>
+  <testcase classname="example.CheckoutTest" name="calculatesTotal" time="0.1250">
+    <failure type="org.opentest4j.AssertionFailedError" message="expected: &lt;42&gt; but was: &lt;41&gt;"><![CDATA[org.opentest4j.AssertionFailedError: expected: <42> but was: <41>
+    at example.CheckoutTest.calculatesTotal(CheckoutTest.java:42)
+]]></failure>
+  </testcase>
+  <testcase classname="example.CheckoutTest" name="loadsFixtureConfig" time="0.005">
+    <error type="java.io.IOException" message="synthetic fixture config unavailable">java.io.IOException: synthetic fixture config unavailable
+    at example.CheckoutTest.loadsFixtureConfig(CheckoutTest.java:57)
+</error>
+  </testcase>
+  <testcase classname="example.CheckoutTest" name="usesOptionalService">
+    <skipped message="disabled in this synthetic environment">Synthetic skip explanation.</skipped>
+  </testcase>
+  <system-out><![CDATA[Example output mentioning <testcase name="not-an-execution"/>.]]></system-out>
+</testsuite>

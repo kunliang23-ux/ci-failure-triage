@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<j:testsuites xmlns:j="urn:ci-triage:synthetic-junit">
+  <j:testsuite name="module">
+    <j:testcase classname="example.RepeatedTest" name="repeatedName"/>
+    <j:testsuite name="nested">
+      <j:testcase classname="example.RepeatedTest" name="repeatedName">
+        <j:failure message="first synthetic assertion">first detail</j:failure>
+        <j:failure message="second synthetic assertion">second detail</j:failure>
+        <j:error message="synthetic teardown error">third detail</j:error>
+      </j:testcase>
+    </j:testsuite>
+  </j:testsuite>
+  <j:testsuite name="sibling">
+    <j:testcase classname="example.RepeatedTest" name="repeatedName"/>
+  </j:testsuite>
+</j:testsuites>

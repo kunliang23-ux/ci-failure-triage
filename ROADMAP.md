@@ -1,7 +1,7 @@
 # CI Failure Triage roadmap
 
 The product question is: **Why did my tests fail, and what should I investigate first?**
-Advance in small, testable stages. Java 17 and Maven remain the backend foundation; JUnit supplies automated tests. Only the Day 1 stage is implemented in this scaffold.
+Advance in small, testable stages. Java 17 and Maven remain the backend foundation; JUnit supplies automated tests. Day 1 and Day 2 (local JUnit XML import and basic CI) are implemented. See docs/JUNIT_XML_IMPORT.md for the current input and evidence contract.
 
 ## Day 1: scaffold and CLI
 
@@ -9,14 +9,15 @@ Advance in small, testable stages. Java 17 and Maven remain the backend foundati
 - Help, version, explicit argument errors, and tests of output and exit codes.
 - Setup instructions, ignore rules, and contributor guidance.
 
-## Day 2: import JUnit XML locally
+## Day 2: import JUnit XML locally and add basic CI (implemented)
 
-- Introduce small models for runs, test identities, outcomes, and failure details.
-- Parse local JUnit XML using Java XML APIs with external entities and external DTD access disabled.
-- Handle single suites, nested suites, failures, errors, skipped tests, and malformed input explicitly.
-- Preserve report source, original messages, stack traces, and provenance. Document line-reference semantics before promising exact locations.
-- Test sanitized fixtures in `src/test/resources`, including passing and malformed reports. Verify counts and extracted fields.
-- Add GitHub Actions to run `mvn --batch-mode clean verify` on JDK 17 for pushes and pull requests.
+- [x] Introduce small immutable models for a report, explicit test identities/suite paths, outcomes, optional decimal durations in seconds, and original outcome details. Full run/commit/environment metadata remains later work.
+- [x] Add `import-junit <report-path>` and preserve the earlier `--report <path>` compatibility alias, help, version, and argument behavior.
+- [x] Parse local JUnit XML using Java XML APIs with external entities and external DTD access disabled.
+- [x] Handle single suites, nested suites, failures, errors, skipped tests, and malformed input explicitly.
+- [x] Preserve original bytes, source names, SHA-256 hashes, decoded messages, and stack traces. Label SAX positions as diagnostics rather than exact source spans.
+- [x] Test sanitized fixtures in `src/test/resources/fixtures`, including a mixed report with 5 executions (2 passed, 1 failed, 1 errored, 1 skipped), nested suites, malformed XML, and a rejected DOCTYPE. Retain earlier fixtures as regressions.
+- [x] Add `.github/workflows/ci.yml` to run `mvn --batch-mode clean verify` on JDK 17 for pushes and pull requests, using verified supported Action releases pinned to commit SHAs. GitHub-hosted execution starts after the workflow is pushed.
 
 Acceptance: a local report produces accurate test outcomes and useful diagnostics without storage, AI, or a web interface.
 
@@ -68,6 +69,6 @@ Acceptance: a local report produces accurate test outcomes and useful diagnostic
 - Add GitHub run/artifact importing with explicit repository selection, credential handling, pagination, and rate-limit behavior.
 - Extend GitHub Actions checks as frontend and integration tests become relevant.
 
-## Before starting Day 2
+## Before starting Stage 3
 
-Be comfortable tracing the JAR manifest to `main()`, calling the testable CLI handler, reading JUnit results, and using Maven lifecycle phases. Agree on the first XML input contract and expected output, then start with sanitized fixtures and a small model. Keep the original report separate from interpreted data.
+Be comfortable tracing the JAR manifest to `main()`, calling the testable CLI handler and parser, reading JUnit results, and using Maven lifecycle phases. Run the mixed fixture and understand its counts, identity, duration, and original evidence. Then define a small log-import contract with exact source-line semantics before adding classification rules.

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites xmlns="urn:ci-triage:synthetic-junit">
+  <testsuite name="module" tests="2">
+    <testcase classname="example.RepeatedTest" name="repeatedName" time="0.01"/>
+    <testsuite name="nested" tests="1">
+      <testcase classname="example.RepeatedTest" name="repeatedName" time="0.02">
+        <failure type="java.lang.AssertionError" message="synthetic nested assertion">synthetic stack trace</failure>
+      </testcase>
+    </testsuite>
+  </testsuite>
+  <testsuite name="sibling" tests="1">
+    <testcase classname="example.RepeatedTest" name="repeatedName"/>
+  </testsuite>
+</testsuites>

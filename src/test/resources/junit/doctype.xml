@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE testsuite [<!ENTITY synthetic SYSTEM "file:///ci-triage-invented-do-not-read.txt">]>
+<testsuite name="synthetic.unsafe">
+  <testcase name="externalEntityMustBeRejected">
+    <failure>&synthetic;</failure>
+  </testcase>
+</testsuite>

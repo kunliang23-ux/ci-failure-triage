@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="synthetic.passing" tests="2">
+  <testcase classname="example.SampleTest" name="passes"/>
+  <testcase name="passesWithoutClassMetadata"/>
+</testsuite>
