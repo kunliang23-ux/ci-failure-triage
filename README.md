@@ -17,19 +17,17 @@ A Java portfolio project to help developers answer:
 
 ## Windows PowerShell setup
 
-Initial inspection of this machine found an empty project folder, Git installed, and no Git repository or remote. `java`, `javac`, and `mvn` were absent from `PATH`. A working Microsoft JDK 17 was found under the user's `.jdks` directory.
-
-Open PowerShell in the project directory. The following enables that existing JDK **for this terminal session**:
+Open PowerShell and replace the two example paths below with your local repository and JDK 17 directories. These are placeholders, not installation paths. The environment settings apply **to this terminal session**:
 
 ```powershell
-Set-Location 'C:\Users\kunli\Downloads\AI-assisted CI failure triage tool'
-$env:JAVA_HOME = Join-Path $env:USERPROFILE '.jdks\ms-17.0.21.0.2'
+Set-Location 'C:\path\to\ci-failure-triage'
+$env:JAVA_HOME = 'C:\path\to\jdk-17'
 $env:Path = "$env:JAVA_HOME\bin;$env:Path"
 java -version
 javac -version
 ```
 
-On another Windows machine, install a JDK 17 first using the [Microsoft OpenJDK installation instructions](https://learn.microsoft.com/en-us/java/openjdk/install), then set `JAVA_HOME` to its installation directory and add its `bin` directory to `PATH`. For a permanent setup, use Windows **Edit environment variables for your account**, then open a new terminal. Use a JDK rather than a JRE because Maven needs a compiler.
+If JDK 17 is not installed, follow the [Microsoft OpenJDK installation instructions](https://learn.microsoft.com/en-us/java/openjdk/install), then set `JAVA_HOME` to its installation directory and add its `bin` directory to `PATH`. For a permanent setup, use Windows **Edit environment variables for your account**, then open a new terminal. Use a JDK rather than a JRE because Maven needs a compiler.
 
 If Maven is not installed, this downloads a portable copy into ignored `.tools/`, checks its SHA-512 checksum, and extracts it. It does not change system settings or require an administrator terminal. The version comes from the [official Maven download page](https://maven.apache.org/download.cgi).
 
@@ -124,7 +122,7 @@ A synthetic XML fixture can describe failed tests while our parser unit tests pa
 
 ## Day 1 validation results
 
-Validated on November 17, 2026, on Windows 11 x64 with Microsoft OpenJDK 17.0.21.0.2 and the checksum-verified portable Maven 3.9.16:
+Validated on November 17, 2026, with Java 17 and checksum-verified Apache Maven 3.9.16:
 
 - Both isolated-cache Maven commands above completed with `BUILD SUCCESS`. Each ran 14 tests, with zero failures, errors, or skipped tests.
 - The packaged JAR returned `0` for `--help`, `--version`, and no arguments. Version output was `CI Failure Triage 0.1.0`.
@@ -143,7 +141,7 @@ All five source XML fixtures retained their original file hashes after the proce
 
 ## Completed Day 2 validation results
 
-On November 17, 2026, using Microsoft OpenJDK 17.0.21.0.2 and the existing local Maven 3.9.16, both commands below passed **75 tests** (38 CLI cases and 37 parser cases), with zero failures, errors, or skips. Run them after the Windows JDK setup above:
+On November 17, 2026, using Java 17 and Apache Maven 3.9.16, both commands below passed **75 tests** (38 CLI cases and 37 parser cases), with zero failures, errors, or skips. Run them after the Windows JDK setup above:
 
 ```powershell
 $env:MAVEN_BASEDIR = (Get-Location).Path
@@ -228,7 +226,7 @@ For `import-junit` (or its `--report` alias), the call path continues from `run(
 
 ## Commit and push to GitHub
 
-The current checkout has `origin` set to `https://github.com/kunliang23-ux/ci-failure-triage.git`. Use that existing remote. After reviewing and validating changes, these are commands for you to run:
+Use the checkout's existing `origin` remote. Verify its URL with `git remote -v` before pushing. After reviewing and validating changes, these are commands for you to run:
 
 ```powershell
 # Review the files and stage only project sources/documentation.
