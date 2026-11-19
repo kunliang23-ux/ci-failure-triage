@@ -32,6 +32,7 @@ class CiTriageCliTest {
                 () -> assertTrue(result.out().contains("--version")),
                 () -> assertTrue(result.out().contains("--report <path>")),
                 () -> assertTrue(result.out().contains("import-junit <report-path>")),
+                () -> assertTrue(result.out().contains("import-log <log-path> [--commit <sha>] [--environment <label>]")),
                 () -> assertTrue(result.out().contains("JUnit XML")),
                 () -> assertEquals("", result.err()));
     }
@@ -236,6 +237,121 @@ class CiTriageCliTest {
                 Arguments.of((Object) new String[]{"import-junit", "missing.xml", "extra.xml"}),
                 Arguments.of((Object) new String[]{"--version", "import-junit"}),
                 Arguments.of((Object) new String[]{"import-junit", "invalid\u0000path.xml"}));
+    }
+
+    @Test
+    void importsLogWithSpacesAndPrintsSuppliedMetadataAndNumberedEvidence(@TempDir Path directory) throws Exception {
+        Path fixture = logFixture("timeout.log");
+        Path path = Files.copy(fixture, directory.resolve("timeout evidence.log"));
+        byte[] original = Files.readAllBytes(path);
+        Result result = invoke("import-log", path.toString(), "--environment", "test runner label",
+                "--commit", "abc123def");
+
+        assertAll(
+                () -> assertEquals(0, result.exitCode()),
+                () -> assertEquals("", result.err()),
+                () -> assertTrue(result.out().contains("Log: " + path.toAbsolutePath().normalize())),
+                () -> assertTrue(result.out().contains("Commit: abc123def")),
+                () -> assertTrue(result.out().contains("Environment: test runner label")),
+                () -> assertTrue(result.out().contains("TIMEOUT [java-timeout]")),
+                () -> assertTrue(result.out().contains("Test: example.InventoryTest#waitsForInventory")),
+                () -> assertTrue(result.out().contains("timeout evidence.log:3-5")),
+                () -> assertTrue(result.out().contains("4 | java.util.concurrent.TimeoutException:")),
+                () -> assertTrue(result.out().contains("5 |     at example.InventoryTest.waitsForInventory")),
+                () -> assertTrue(result.out().contains("SHA-256: ")),
+                () -> assertArrayEquals(original, Files.readAllBytes(path)));
+    }
+
+    @Test
+    void passingLogWithMissingMetadataShowsNoFindings(@TempDir Path directory) throws Exception {
+        Path path = Files.copy(logFixture("passing.log"), directory.resolve("passing.log"));
+        Result result = invoke("import-log", path.toString());
+
+        assertAll(
+                () -> assertEquals(0, result.exitCode()),
+                () -> assertEquals("", result.err()),
+                () -> assertTrue(result.out().contains("Commit: unknown")),
+                () -> assertTrue(result.out().contains("Environment: unknown")),
+                () -> assertTrue(result.out().contains("Findings: 0")),
+                () -> assertTrue(result.out().contains("No failure diagnostics matched.")));
+    }
+
+    @Test
+    void emptyImportedLogReportsUnavailableEvidence(@TempDir Path directory) throws Exception {
+        Path path = Files.createFile(directory.resolve("empty.log"));
+        Result result = invoke("import-log", path.toString(), "--commit", "abc123");
+
+        assertAll(
+                () -> assertEquals(0, result.exitCode()),
+                () -> assertEquals("", result.err()),
+                () -> assertTrue(result.out().contains("Commit: abc123")),
+                () -> assertTrue(result.out().contains("Environment: unknown")),
+                () -> assertTrue(result.out().contains("Lines: 0")),
+                () -> assertTrue(result.out().contains("Findings: 0")),
+                () -> assertTrue(result.out().contains("Evidence unavailable")));
+    }
+
+    @Test
+    void logReadAndDecodeErrorsGoOnlyToStderr(@TempDir Path directory) throws Exception {
+        Path wrongEncoding = Files.write(directory.resolve("invalid-utf8.log"), new byte[]{(byte) 0xff});
+
+        assertAll(
+                () -> assertLogError(invoke("import-log", directory.resolve("missing.log").toString()), 1,
+                        "missing.log", "file does not exist"),
+                () -> assertLogError(invoke("import-log", directory.toString()), 1,
+                        "Cannot read log", "Expected a regular file"),
+                () -> assertLogError(invoke("import-log", wrongEncoding.toString()), 1,
+                        "invalid-utf8.log", "expected valid UTF-8"));
+    }
+
+    @Test
+    void terminalControlsInEvidenceAreShownAsLiteralEscapes(@TempDir Path directory) throws Exception {
+        Path path = Files.writeString(directory.resolve("color.log"), "\u001b[31m[ERROR]\u001b[0m Synthetic error");
+        Result result = invoke("import-log", path.toString());
+
+        assertAll(
+                () -> assertEquals(0, result.exitCode()),
+                () -> assertEquals("", result.err()),
+                () -> assertTrue(result.out().contains("1 | \\u001b[31m[ERROR]\\u001b[0m Synthetic error")),
+                () -> assertTrue(result.out().indexOf('\u001b') < 0));
+    }
+
+    @ParameterizedTest
+    @MethodSource("invalidLogArguments")
+    void validatesImportLogArgumentsBeforeReadingAnyFile(String[] args, String expected) {
+        assertLogError(invoke(args), 2, expected, "--help");
+    }
+
+    static Stream<Arguments> invalidLogArguments() {
+        return Stream.of(
+                Arguments.of(new String[]{"import-log"}, "requires a log file path"),
+                Arguments.of(new String[]{"import-log", " "}, "requires a log file path"),
+                Arguments.of(new String[]{"import-log", "--environment"}, "requires a log file path"),
+                Arguments.of(new String[]{"import-log", "missing.log", "--unknown"}, "Unknown import-log option"),
+                Arguments.of(new String[]{"import-log", "missing.log", "extra.log"}, "Unknown import-log option"),
+                Arguments.of(new String[]{"import-log", "missing.log", "--commit"}, "--commit requires a value"),
+                Arguments.of(new String[]{"import-log", "missing.log", "--commit", "--environment", "ci"},
+                        "--commit requires a value"),
+                Arguments.of(new String[]{"import-log", "missing.log", "--environment", ""},
+                        "--environment requires a value"),
+                Arguments.of(new String[]{"import-log", "missing.log", "--commit", "abc123", "--commit", "abc456"},
+                        "--commit may be specified only once"),
+                Arguments.of(new String[]{"import-log", "missing.log", "--environment", "ci", "--environment", "test"},
+                        "--environment may be specified only once"),
+                Arguments.of(new String[]{"import-log", "invalid\u0000path.log"}, "Invalid log path"),
+                Arguments.of(new String[]{"--help", "import-log"}, "Choose only one argument"));
+    }
+
+    private static void assertLogError(Result result, int exitCode, String firstText, String secondText) {
+        assertAll(
+                () -> assertEquals(exitCode, result.exitCode()),
+                () -> assertEquals("", result.out()),
+                () -> assertTrue(result.err().contains(firstText), result.err()),
+                () -> assertTrue(result.err().contains(secondText), result.err()));
+    }
+
+    private static Path logFixture(String name) throws Exception {
+        return Path.of(CiTriageCliTest.class.getResource("/fixtures/logs/" + name).toURI());
     }
 
     private static void assertUnknownArgument(Result result, String argument) {

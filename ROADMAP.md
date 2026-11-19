@@ -1,7 +1,7 @@
 # CI Failure Triage roadmap
 
 The product question is: **Why did my tests fail, and what should I investigate first?**
-Advance in small, testable stages. Java 17 and Maven remain the backend foundation; JUnit supplies automated tests. Day 1 and Day 2 (local JUnit XML import and basic CI) are implemented. See docs/JUNIT_XML_IMPORT.md for the current input and evidence contract.
+Advance in small, testable stages. Java 17 and Maven remain the backend foundation, and JUnit supplies automated tests. Day 1 through Stage 3 are implemented. The input and evidence contracts are in [JUnit XML import](docs/JUNIT_XML_IMPORT.md) and [log import](docs/LOG_IMPORT.md).
 
 ## Day 1: scaffold and CLI
 
@@ -21,13 +21,13 @@ Advance in small, testable stages. Java 17 and Maven remain the backend foundati
 
 Acceptance: a local report produces accurate test outcomes and useful diagnostics without storage, AI, or a web interface.
 
-## Stage 3: logs and deterministic classification
+## Stage 3: logs and deterministic classification (implemented)
 
-- Import local build/test logs while preserving original text and exact, one-based source line numbers.
-- Attach evidence to failures when supported; distinguish test-specific evidence from run-wide build failures.
-- Classify assertion errors, missing dependencies, compilation errors, timeouts, and unknown failures using explicit, tested rules.
-- Define precedence and ambiguous cases. Return unknown when no rule has sufficient support.
-- Display test names, error details, commit SHAs, and environments when supplied; keep absent metadata explicitly unknown.
+- [x] Add `import-log <log-path>` for one local UTF-8 file. Preserve source path, original bytes, decoded text, SHA-256, and exact one-based line numbers.
+- [x] Classify assertion, dependency, compiler, timeout, and unknown diagnostics with deterministic rules. Print each finding's rule and evidence excerpt.
+- [x] Recognize explicitly named Surefire tests and retain separate findings for independent diagnostics. Use build/test summaries as fallback evidence.
+- [x] Display supplied commit and environment metadata, with `unknown` for omitted values.
+- [x] Cover the rules, line semantics, and CLI with sanitized fixtures and tests.
 
 ## Stage 4: group similar failures
 
@@ -69,6 +69,6 @@ Acceptance: a local report produces accurate test outcomes and useful diagnostic
 - Add GitHub run/artifact importing with explicit repository selection, credential handling, pagination, and rate-limit behavior.
 - Extend GitHub Actions checks as frontend and integration tests become relevant.
 
-## Before starting Stage 3
+## Before starting Stage 4
 
-Be comfortable tracing the JAR manifest to `main()`, calling the testable CLI handler and parser, reading JUnit results, and using Maven lifecycle phases. Run the mixed fixture and understand its counts, identity, duration, and original evidence. Then define a small log-import contract with exact source-line semantics before adding classification rules.
+Run the mixed log fixture and trace each finding back to the source range. Define what makes two findings similar and how grouping will retain each original excerpt before adding normalization for that stage.

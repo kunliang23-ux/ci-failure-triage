@@ -1,0 +1,6 @@
+[INFO] Running example.InventoryTest
+[ERROR] Tests run: 1, Failures: 0, Errors: 1, Skipped: 0
+[ERROR] example.InventoryTest.waitsForInventory -- Time elapsed: 0.050 s <<< ERROR!
+java.util.concurrent.TimeoutException: waitsForInventory() timed out after 50 milliseconds
+    at example.InventoryTest.waitsForInventory(InventoryTest.java:31)
+[INFO] BUILD FAILURE

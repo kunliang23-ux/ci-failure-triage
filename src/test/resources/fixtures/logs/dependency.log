@@ -1,0 +1,6 @@
+[INFO] Scanning for projects...
+[INFO] BUILD FAILURE
+[ERROR] Failed to execute goal on project fixture: Could not resolve dependencies for project example:fixture:jar:1.0
+[ERROR] dependency: example:sample-library:jar:1.0 (test)
+[ERROR]     Could not find artifact example:sample-library:jar:1.0 in fixture repository
+[ERROR] -> [Help 1]

@@ -28,7 +28,7 @@ Exit `0` means the report was imported, including reports containing failed test
 - Other subtrees, including properties, stdout/stderr, and producer metadata, are opaque. Their bytes remain in the original source but they do not add test executions or populate separate fields. Producer-specific outcome extensions and status attributes are not interpreted in this initial subset.
 - Outside opaque metadata, unexpected placement of a recognized structural element, or non-whitespace text outside details, is rejected. Malformed XML never returns a partial report.
 
-This is an explicit subset, rather than a claim to support every producer's JUnit XML dialect. Add a fixture and define its behavior before expanding it. Declared-count discrepancy reporting, rerun/flaky extensions, run metadata, and build logs are later extensions.
+This contract covers the XML structures above. Add a fixture and define its behavior before expanding it. Declared-count discrepancy reporting, rerun/flaky extensions, and XML run metadata are later extensions. Local build and test logs have a separate [import command](LOG_IMPORT.md).
 
 ## Models
 
@@ -49,7 +49,7 @@ This is an explicit subset, rather than a claim to support every producer's JUni
 
 Parsed fields are a separate view. XML processing decodes entities and normalizes line endings/attribute whitespace according to XML rules. The parser does not additionally trim, normalize error messages, or group stack traces. A decoded message is not presented as a byte-for-byte copy of the original XML.
 
-The [SAX Locator contract](https://docs.oracle.com/en/java/javase/17/docs/api/java.xml/org/xml/sax/Locator.html) reports diagnostic positions at the end of an event and describes them as approximate. We snapshot a testcase/detail position when its opening-tag event is delivered. For a multiline opening tag, its line is typically where that tag ends. These positions are **not exact source spans or supporting log-line citations**. Use original bytes as the authoritative evidence; exact log citations require the separate log-import stage.
+The SAX Locator reports approximate diagnostic positions at the end of an event. We snapshot a testcase/detail position when its opening-tag event is delivered. For a multiline opening tag, its line is typically where that tag ends. Use the original bytes as authoritative XML evidence. The [log importer](LOG_IMPORT.md) provides exact line ranges for its own text input. See the [SAX Locator contract](https://docs.oracle.com/en/java/javase/17/docs/api/java.xml/org/xml/sax/Locator.html).
 
 The returned report retains its snapshot in memory; a parse exception retains rejected bytes too. The CLI prints the hash and leaves the source file intact. It does not create a durable evidence archive or database, and a hash is not a replacement for the report itself. Whole reports currently reside in memory; large-file streaming and import quotas are not implemented.
 

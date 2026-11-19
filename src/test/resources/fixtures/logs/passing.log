@@ -1,0 +1,4 @@
+[INFO] Running example.TimeoutSettingsTest
+[INFO] Test timeoutSettingIsRespected passed with a timeout of 100 ms
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0
+[INFO] BUILD SUCCESS

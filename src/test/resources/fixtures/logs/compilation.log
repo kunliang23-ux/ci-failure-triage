@@ -1,0 +1,8 @@
+[INFO] Compiling 2 source files
+[ERROR] COMPILATION ERROR :
+[INFO] -------------------------------------------------------------
+[ERROR] src/main/java/example/Checkout.java:[12,9] cannot find symbol
+[ERROR]   symbol:   class MissingType
+[ERROR]   location: class example.Checkout
+[INFO] BUILD FAILURE
+[ERROR] Failed to execute goal org.apache.maven.plugins:maven-compiler-plugin:3.14.1:compile on project fixture: Compilation failure

@@ -1,0 +1,10 @@
+[INFO] Running example.CartTest
+[ERROR] example.CartTest.calculatesTotal -- Time elapsed: 0.003 s <<< FAILURE!
+java.lang.AssertionError: expected 42 but was 41
+    at example.CartTest.calculatesTotal(CartTest.java:24)
+
+[ERROR] Could not find artifact example:sample-library:jar:1.0 in fixture repository
+[ERROR] A different fixture step ended unexpectedly
+
+[ERROR] src/main/java/example/Checkout.java:[12,9] incompatible types: int cannot be converted to String
+[INFO] BUILD FAILURE

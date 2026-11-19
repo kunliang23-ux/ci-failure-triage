@@ -4,7 +4,7 @@ A Java portfolio project to help developers answer:
 
 > Why did my tests fail, and what should I investigate first?
 
-**Current implementation: Day 1 and Day 2, local JUnit XML import plus basic CI.** The CLI shows help/version information and imports a report into explicit identities, optional durations, and passed, failed, error, and skipped outcomes while retaining original bytes and provenance. GitHub Actions builds and tests on pushes and pull requests. See the [XML input contract](docs/JUNIT_XML_IMPORT.md). Log classification, grouping, comparisons, SQLite storage, AI explanations, GitHub importing, the Spring Boot API, and the React/TypeScript dashboard remain in [ROADMAP.md](ROADMAP.md).
+**Current implementation covers Day 1 through Day 3.** The CLI imports local JUnit XML reports and classifies diagnostics in local UTF-8 logs. It preserves original source bytes and displays exact numbered evidence for log findings. GitHub Actions builds and tests on pushes and pull requests. See the [XML input contract](docs/JUNIT_XML_IMPORT.md), [log import contract](docs/LOG_IMPORT.md), and [roadmap](ROADMAP.md).
 
 ## Requirements and versions
 
@@ -173,17 +173,36 @@ Captured process results are in `target/cli-smoke-results.json` and `target/day2
 | `import-junit <report-path>` with a supported report | Source, SHA-256, total/passed/failed/errored/skipped counts, test names, available durations, and outcome details | Empty | `0`, even if reported tests failed |
 | `import-junit <report-path>` with unreadable, malformed, or unsupported input | Empty; no partial import | Source/read/parse diagnostic | `1` |
 | `--report <path>` | Compatibility alias for `import-junit`, with identical output and exit behavior | As above | As above |
-| Missing/extra report arguments, or an invalid path syntax | Empty | Usage error and `--help` guidance | `2` |
+| `import-log <log-path> [--commit <sha>] [--environment <label>]` | Source, SHA-256, metadata, line count, findings and numbered evidence when available | Empty | `0`, even with failure findings |
+| `import-log <log-path>` with an unreadable file or invalid UTF-8 | Empty | Read or decoding diagnostic | `1` |
+| Missing or extra arguments, duplicate log flags, or invalid path syntax | Empty | Usage error and `--help` guidance | `2` |
 | Any unknown argument, including a bare file path | Empty | Unknown argument and `--help` guidance | `2` |
 | Multiple operations, including repeated flags | Empty | Choose one operation and `--help` guidance | `2` |
 
-Arguments are checked before printing successful output, so `--help --unknown` still fails. Use one operation per invocation. Quote a report path containing spaces. A filename beginning with `--` must be supplied using an explicit relative or absolute path, such as `.\--example.xml`.
+Arguments are checked before printing successful output, so `--help --unknown` still fails. Use one operation per invocation. Quote paths and environment labels containing spaces. A filename beginning with `--` must be supplied using an explicit relative or absolute path, such as `.\--example.xml`.
 
 For `fixtures/mixed-results.xml`, the summary is `Tests: 5 | passed=2 failed=1 errors=1 skipped=1`. `Tests` is the total; `errors` means errored executions. Counts come from actual `<testcase>` elements, rather than declared suite totals. `FAILED` and `ERROR` describe XML outcomes; they do not claim a root cause. The earlier four-test `junit/mixed-suite.xml` fixture remains unchanged.
 
 The parser supports a single `<testsuite>`, a `<testsuites>` container, nested suites, and namespace prefixes/default namespaces. Testcases must be direct suite children. `<failure>`, `<error>`, and `<skipped>` mark outcomes; no such marker means passed under this input contract. Empty suites are valid. Repeated names remain separate executions. Unsupported roots and malformed input are rejected clearly.
 
 Optional testcase `time` is a nonnegative number of seconds, stored using `BigDecimal` without floating-point rounding. Missing duration stays unknown. Malformed/negative durations are rejected. Failure/error messages, types, and stack traces are retained as decoded fields; original report bytes, source path, and SHA-256 are kept separately. XML decoding may normalize entities/line endings. SAX line/column positions are diagnostic estimates, not exact XML spans or log citations. The [XML contract](docs/JUNIT_XML_IMPORT.md) describes the full supported subset and evidence limits.
+
+## Import a local log
+
+From the project root after building the JAR, try the sanitized fixtures in PowerShell.
+
+```powershell
+java -jar target/ci-failure-triage.jar import-log src/test/resources/fixtures/logs/timeout.log --commit abc1234 --environment 'sample CI'
+java -jar target/ci-failure-triage.jar import-log src/test/resources/fixtures/logs/mixed.log
+java -jar target/ci-failure-triage.jar import-log src/test/resources/fixtures/logs/passing.log
+java -jar target/ci-failure-triage.jar import-log src/test/resources/fixtures/logs/unknown.log
+java -jar target/ci-failure-triage.jar import-log target/nonexistent.log
+$LASTEXITCODE # 1 for the nonexistent file
+```
+
+Put metadata flags after the path in either order. The CLI uses only the supplied values and shows `unknown` when a value is omitted. The timeout example reports `TIMEOUT [java-timeout]` and cites lines 3–5. The mixed example reports four independent findings. Passing input yields zero findings, and an empty log reports unavailable evidence.
+
+The reader preserves UTF-8 bytes and decoded text. LF and CRLF delimit physical lines, blank lines count, and a final line without a newline keeps its number. The rules match explicit Java, JUnit, and Maven diagnostics, with generic summaries as fallback evidence. Each finding describes what the log shows. See the [supported rules, precedence, and evidence details](docs/LOG_IMPORT.md).
 
 ## GitHub Actions CI
 
@@ -200,17 +219,21 @@ Actions are pinned to the verified release commits of [Checkout v7.0.1](https://
 | File | Purpose |
 | --- | --- |
 | `pom.xml` | Java 17 target, application version, test dependency, pinned plugins, fixed JAR name, and manifest entry point. |
-| `src/main/java/com/kunliang/citriage/CiTriageCli.java` | `main()`, argument handling, help/errors, report import/output, and version loading. |
+| `src/main/java/com/kunliang/citriage/CiTriageCli.java` | `main()`, argument handling, report and log output, and version loading. |
 | `src/main/java/com/kunliang/citriage/report/JUnitXmlParser.java` | Secure local XML parser and source-aware diagnostics. |
 | `src/main/java/com/kunliang/citriage/report/TestIdentity.java` | Explicit reported class/test name pair and CLI display name. |
 | `src/main/java/com/kunliang/citriage/report/` models | Immutable source snapshot, report, test result, outcome details, diagnostic position, and parse exception. |
+| `src/main/java/com/kunliang/citriage/log/` | UTF-8 reader, numbered source and finding models, and deterministic rules. |
 | `src/main/resources/ci-triage.properties` | Version template; Maven replaces `${project.version}` with the POM version. |
 | `src/test/java/com/kunliang/citriage/CiTriageCliTest.java` | JUnit tests for output streams, exit codes, no arguments, and invalid combinations. |
 | `src/test/java/com/kunliang/citriage/report/JUnitXmlParserTest.java` | Tests counts, nesting, decoded evidence, immutability, malformed input, encodings, and blocked external resources. |
+| `src/test/java/com/kunliang/citriage/log/` | Tests physical lines, snapshots, rules, and exact evidence ranges. |
 | `src/test/resources/fixtures/` | Requested Day 2 passing, five-test mixed, nested, malformed, and DOCTYPE fixtures, plus expected observations. |
+| `src/test/resources/fixtures/logs/` | Seven sanitized build and test logs, with their expected findings. |
 | `src/test/resources/junit/` | Unchanged earlier fixtures retained for regression coverage. |
 | `.github/workflows/ci.yml` | JDK 17 Maven checks on pushes and pull requests. |
 | `docs/JUNIT_XML_IMPORT.md` | The supported input format, outcome models, evidence semantics, and API example. |
+| `docs/LOG_IMPORT.md` | Log import options, evidence conventions, and classification rules. |
 | `.gitignore` | Excludes build output, local tools, credentials, SQLite files, and editor/OS temporary files. Deliberately allows sanitized `.log` fixtures. |
 | `AGENTS.md` | Future Codex instructions about scope, existing work, evidence, checks, and handoffs. |
 | `ROADMAP.md` | Later implementation stages and their boundaries. |
@@ -222,6 +245,8 @@ When you run `java -jar`, Java reads `META-INF/MANIFEST.MF` inside the JAR. Mave
 
 For `import-junit` (or its `--report` alias), the call path continues from `run()` to `importReport()`, then `JUnitXmlParser.parse(Path)`. The parser reads a byte snapshot, builds the outcome models, and returns `JUnitReport`. The CLI prints the accepted report and returns `0`; read/parse errors return `1`, and usage errors return `2`. `main()` turns that integer into the process exit status. A failed test inside the report does not itself mean the import failed.
 
+For `import-log`, `run()` validates the path and flags. `LogReader.read(Path)` creates a `BuildLog` snapshot, `LogClassifier.classify()` returns findings with original evidence, and the CLI prints the result.
+
 `.tools/` contains ignored local tooling/cache files when the portable setup is used. `target/` contains generated files, including the executable JAR. Neither belongs in the source commit.
 
 ## Commit and push to GitHub
@@ -231,10 +256,10 @@ Use the checkout's existing `origin` remote. Verify its URL with `git remote -v`
 ```powershell
 # Review the files and stage only project sources/documentation.
 git status --short
-git add src docs .github/workflows/ci.yml README.md AGENTS.md ROADMAP.md
+git add src docs README.md AGENTS.md ROADMAP.md
 git diff --cached --check
 git diff --cached
-git commit -m "Complete Day 2 JUnit XML import and CI"
+git commit -m "Add local log import and diagnostic rules"
 
 # Verify the existing destination.
 git remote -v
@@ -243,6 +268,6 @@ git push -u origin HEAD
 
 Do not overwrite an existing remote. If a separate checkout uses another remote name, use that name in the push command. GitHub authentication must already be configured. If Git asks for an author identity, set your chosen `user.name` and `user.email` before committing.
 
-## After Day 2
+## After Day 3
 
-Trace the Maven lifecycle and JAR entry point above, run the five-test mixed fixture, then read the parser tests and XML contract. Extend the input contract with new sanitized fixtures before adding another producer's dialect. The next stage is local log evidence and deterministic classification; keep storage and AI in their later roadmap stages.
+Trace a finding from the timeout fixture through the matching rule and its original line range. The next stage groups similar failures while retaining each finding's source evidence.
