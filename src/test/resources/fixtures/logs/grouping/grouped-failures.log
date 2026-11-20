@@ -1,0 +1,24 @@
+[ERROR] example.CartTest.calculatesTotal -- Time elapsed: 0.010 s <<< FAILURE!
+org.opentest4j.AssertionFailedError: expected: <42> but was: <41>
+    at example.CartTest.calculatesTotal(CartTest.java:24)
+
+[ERROR] Could not resolve dependencies for project example:fixture:jar:1.0
+[ERROR]   dependency: example:sample-library:jar:1.2.0 (test)
+[ERROR]     Could not find artifact example:sample-library:jar:1.2.0 in fixture repository
+
+[ERROR] example.InvoiceTest.roundsTotal -- Time elapsed: 0.012 s <<< FAILURE!
+[ERROR]   org.opentest4j.AssertionFailedError: expected: <42> but was: <41>
+    at example.InvoiceTest.roundsTotal(InvoiceTest.java:38)
+
+[ERROR] src/main/java/example/Checkout.java:[12,9] cannot find symbol
+[ERROR]   symbol:   class MissingType
+[ERROR]   location: class example.Checkout
+
+[ERROR] example.OrderTest.appliesDiscount -- Time elapsed: 0.020 s <<< FAILURE!
+org.opentest4j.AssertionFailedError: expected: <42> but was: <41>
+    at example.OrderTest.appliesDiscount(OrderTest.java:61)
+
+[ERROR] Could not resolve dependencies for project example:fixture:jar:1.0
+[ERROR] dependency: example:sample-library:jar:1.2.0 (test)
+[ERROR] Could not find artifact example:sample-library:jar:1.2.0 in fixture repository
+[INFO] BUILD FAILURE

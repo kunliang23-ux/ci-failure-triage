@@ -1,7 +1,7 @@
 # CI Failure Triage roadmap
 
 The product question is: **Why did my tests fail, and what should I investigate first?**
-Advance in small, testable stages. Java 17 and Maven remain the backend foundation, and JUnit supplies automated tests. Day 1 through Stage 3 are implemented. The input and evidence contracts are in [JUnit XML import](docs/JUNIT_XML_IMPORT.md) and [log import](docs/LOG_IMPORT.md).
+The 15-day plan advances in small, testable stages. Java 17 and Maven remain the backend foundation, and JUnit supplies automated tests. Days 1–4 are implemented. Stages 5 onward describe future work. See [JUnit XML import](docs/JUNIT_XML_IMPORT.md), [log import](docs/LOG_IMPORT.md), and [failure grouping](docs/GROUPING.md).
 
 ## Day 1: scaffold and CLI
 
@@ -21,7 +21,7 @@ Advance in small, testable stages. Java 17 and Maven remain the backend foundati
 
 Acceptance: a local report produces accurate test outcomes and useful diagnostics without storage, AI, or a web interface.
 
-## Stage 3: logs and deterministic classification (implemented)
+## Day 3: logs and deterministic classification (implemented)
 
 - [x] Add `import-log <log-path>` for one local UTF-8 file. Preserve source path, original bytes, decoded text, SHA-256, and exact one-based line numbers.
 - [x] Classify assertion, dependency, compiler, timeout, and unknown diagnostics with deterministic rules. Print each finding's rule and evidence excerpt.
@@ -29,11 +29,12 @@ Acceptance: a local report produces accurate test outcomes and useful diagnostic
 - [x] Display supplied commit and environment metadata, with `unknown` for omitted values.
 - [x] Cover the rules, line semantics, and CLI with sanitized fixtures and tests.
 
-## Stage 4: group similar failures
+## Day 4: group similar failures (implemented)
 
-- Normalize derived copies of messages and group likely related failures deterministically.
-- Keep original evidence accessible. Do not remove differences such as expected/actual values when they change the diagnosis.
-- Test both failures that should group and failures that must remain distinct.
+- [x] Add an optional `import-log <log-path> --group` view for one local log while preserving individual output as the default.
+- [x] Match exact category and diagnostic signatures with conservative normalization. Keep unknowns as singletons and order groups by their first evidence line.
+- [x] Show stable IDs, occurrence counts, distinct known tests, unknown identities, and every member's original numbered evidence.
+- [x] Verify grouping and meaningful differences with a six-finding, three-group fixture and Java 17 tests.
 
 ## Stage 5: persistence and compatible baselines
 
@@ -68,7 +69,3 @@ Acceptance: a local report produces accurate test outcomes and useful diagnostic
 - Show unknowns and insufficient evidence clearly. Let developers trace explanations back to source lines.
 - Add GitHub run/artifact importing with explicit repository selection, credential handling, pagination, and rate-limit behavior.
 - Extend GitHub Actions checks as frontend and integration tests become relevant.
-
-## Before starting Stage 4
-
-Run the mixed log fixture and trace each finding back to the source range. Define what makes two findings similar and how grouping will retain each original excerpt before adding normalization for that stage.

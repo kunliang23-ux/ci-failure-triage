@@ -12,9 +12,11 @@ import java.util.List;
 import java.util.Properties;
 
 import com.kunliang.citriage.log.BuildLog;
+import com.kunliang.citriage.log.FailureGroup;
 import com.kunliang.citriage.log.LogClassifier;
 import com.kunliang.citriage.log.LogEvidence;
 import com.kunliang.citriage.log.LogFinding;
+import com.kunliang.citriage.log.LogGrouper;
 import com.kunliang.citriage.log.LogLine;
 import com.kunliang.citriage.log.LogReader;
 import com.kunliang.citriage.report.JUnitReport;
@@ -33,7 +35,7 @@ public final class CiTriageCli {
             Import a local JUnit XML report or inspect failure diagnostics in a local UTF-8 log.
 
             Usage: java -jar target/ci-failure-triage.jar import-junit <report-path>
-                   java -jar target/ci-failure-triage.jar import-log <log-path> [--commit <sha>] [--environment <label>]
+                   java -jar target/ci-failure-triage.jar import-log <log-path> [--commit <sha>] [--environment <label>] [--group]
                    java -jar target/ci-failure-triage.jar [--help | --version | --report <path>]
 
             Arguments (choose one operation):
@@ -43,7 +45,8 @@ public final class CiTriageCli {
               --version                   Show the application version.
               --report <path>             Compatibility alias for import-junit.
 
-            For import-log, each optional metadata flag may appear once after the path.
+            For import-log, each optional flag may appear once after the path.
+            Use --group to group similar diagnostics and show every member's evidence.
             Omitted commit and environment values are displayed as unknown.
             Quote paths and environment labels containing spaces.
             With no arguments, show help.
@@ -98,24 +101,33 @@ public final class CiTriageCli {
         }
         String commit = null;
         String environment = null;
-        for (int i = 2; i < args.length; i += 2) {
-            String option = args[i];
+        boolean grouped = false;
+        for (int i = 2; i < args.length;) {
+            String option = args[i++];
+            if ("--group".equals(option)) {
+                if (grouped) {
+                    return argumentError(err, "--group may be specified only once.");
+                }
+                grouped = true;
+                continue;
+            }
             if (!"--commit".equals(option) && !"--environment".equals(option)) {
                 return argumentError(err, "Unknown import-log option: '" + option + "'.");
             }
-            if (i + 1 == args.length || missingValue(args[i + 1])) {
+            if (i == args.length || missingValue(args[i])) {
                 return argumentError(err, option + " requires a value.");
             }
+            String value = args[i++];
             if ("--commit".equals(option)) {
                 if (commit != null) {
                     return argumentError(err, "--commit may be specified only once.");
                 }
-                commit = args[i + 1];
+                commit = value;
             } else {
                 if (environment != null) {
                     return argumentError(err, "--environment may be specified only once.");
                 }
-                environment = args[i + 1];
+                environment = value;
             }
         }
 
@@ -141,37 +153,79 @@ public final class CiTriageCli {
             return 1;
         }
 
-        printLog(log, new LogClassifier().classify(log), commit, environment, out);
+        List<LogFinding> findings = new LogClassifier().classify(log);
+        if (grouped) {
+            List<FailureGroup> groups = new LogGrouper().group(findings);
+            printGroupedLog(log, findings.size(), groups, commit, environment, out);
+        } else {
+            printLog(log, findings, commit, environment, out);
+        }
         return 0;
     }
 
     private static void printLog(BuildLog log, List<LogFinding> findings, String commit, String environment,
                                  PrintStream out) {
+        printLogSummary(log, findings.size(), commit, environment, out);
+        printLogStatus(log, findings.size(), "Findings describe diagnostics observed in this log.", out);
+        for (LogFinding finding : findings) {
+            out.println();
+            out.println(finding.category() + " [" + finding.ruleId() + "]");
+            out.println("  " + finding.explanation());
+            finding.testIdentity().ifPresent(test -> out.println("  Test: " + printableLogText(test.displayName())));
+            printEvidence(finding.evidence(), out);
+        }
+    }
+
+    private static void printGroupedLog(BuildLog log, int findingCount, List<FailureGroup> groups, String commit,
+                                        String environment, PrintStream out) {
+        printLogSummary(log, findingCount, commit, environment, out);
+        out.println("Groups: " + groups.size());
+        printLogStatus(log, findingCount,
+                "Groups indicate diagnostic similarity. A shared root cause requires further evidence.", out);
+        for (FailureGroup group : groups) {
+            out.println();
+            out.println("Group " + group.id() + " | " + group.category() + " | occurrences=" + group.occurrenceCount());
+            out.println("  Distinct known tests: " + group.distinctKnownTestCount()
+                    + " | Unknown test occurrences: " + group.unknownTestOccurrenceCount());
+            out.println("  Representative diagnostic:");
+            for (String line : group.signature().split("\n", -1)) {
+                out.println("    " + printableLogText(line));
+            }
+            for (LogFinding member : group.members()) {
+                String testName = member.testIdentity().map(test -> printableLogText(test.displayName()))
+                        .orElse("unknown");
+                out.println("  Test: " + testName + " [" + member.ruleId() + "]");
+                printEvidence(member.evidence(), out);
+            }
+        }
+    }
+
+    private static void printLogSummary(BuildLog log, int findingCount, String commit, String environment,
+                                        PrintStream out) {
         out.println("Log: " + printableLogText(log.source().name()));
         out.println("SHA-256: " + log.source().sha256());
         out.println("Commit: " + (commit == null ? "unknown" : printableLogText(commit)));
         out.println("Environment: " + (environment == null ? "unknown" : printableLogText(environment)));
         out.println("Lines: " + log.lines().size());
-        out.println("Findings: " + findings.size());
+        out.println("Findings: " + findingCount);
+    }
+
+    private static void printLogStatus(BuildLog log, int findingCount, String description, PrintStream out) {
         if (log.isBlank()) {
             out.println("Evidence unavailable: the log is empty or blank.");
-        } else if (findings.isEmpty()) {
+        } else if (findingCount == 0) {
             out.println("No failure diagnostics matched.");
         } else {
-            out.println("Findings describe diagnostics observed in this log.");
+            out.println(description);
         }
-        for (LogFinding finding : findings) {
-            LogEvidence evidence = finding.evidence();
-            out.println();
-            out.println(finding.category() + " [" + finding.ruleId() + "]");
-            out.println("  " + finding.explanation());
-            finding.testIdentity().ifPresent(test -> out.println("  Test: " + printableLogText(test.displayName())));
-            String range = evidence.firstLine() == evidence.lastLine() ? Integer.toString(evidence.firstLine())
-                    : evidence.firstLine() + "-" + evidence.lastLine();
-            out.println("  Evidence: " + printableLogText(evidence.source().name()) + ":" + range);
-            for (LogLine line : evidence.lines()) {
-                out.println("    " + line.number() + " | " + printableLogText(line.text()));
-            }
+    }
+
+    private static void printEvidence(LogEvidence evidence, PrintStream out) {
+        String range = evidence.firstLine() == evidence.lastLine() ? Integer.toString(evidence.firstLine())
+                : evidence.firstLine() + "-" + evidence.lastLine();
+        out.println("  Evidence: " + printableLogText(evidence.source().name()) + ":" + range);
+        for (LogLine line : evidence.lines()) {
+            out.println("    " + line.number() + " | " + printableLogText(line.text()));
         }
     }
 

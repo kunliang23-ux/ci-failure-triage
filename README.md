@@ -4,7 +4,7 @@ A Java portfolio project to help developers answer:
 
 > Why did my tests fail, and what should I investigate first?
 
-**Current implementation covers Day 1 through Day 3.** The CLI imports local JUnit XML reports and classifies diagnostics in local UTF-8 logs. It preserves original source bytes and displays exact numbered evidence for log findings. GitHub Actions builds and tests on pushes and pull requests. See the [XML input contract](docs/JUNIT_XML_IMPORT.md), [log import contract](docs/LOG_IMPORT.md), and [roadmap](ROADMAP.md).
+**Days 1–4 of the 15-day plan are implemented.** The CLI imports local JUnit XML reports and classifies diagnostics in local UTF-8 logs. It can group similar log findings while preserving original source bytes and each finding's exact numbered evidence. GitHub Actions builds and tests on pushes and pull requests. See the [XML input contract](docs/JUNIT_XML_IMPORT.md), [log import contract](docs/LOG_IMPORT.md), [grouping rules](docs/GROUPING.md), and [roadmap](ROADMAP.md).
 
 ## Requirements and versions
 
@@ -164,6 +164,10 @@ Other checks covered passing/nested reports, DOCTYPE rejection, the existing ali
 
 Captured process results are in `target/cli-smoke-results.json` and `target/day2-*.txt`. The ignored `.tools/day2-validation/` directory retains a copy of the process results and `clean-verify.log` across a later Maven `clean`. GitHub-hosted CI has not been executed from these local changes; it will be triggered by a push or pull request. No local validation checks were blocked.
 
+## Day 4 validation results
+
+`mvn test` and `mvn clean verify` each passed 153 tests with Java 17 and Maven 3.9.16, using the existing local cache in offline mode. The 27 packaged CLI checks covered the grouped fixture, repeatable IDs and ordering, byte-for-byte Day 3 compatibility for eight ungrouped log runs, JUnit import and its `--report` alias, and stdout, stderr, and exit codes. The Maven logs and packaged process captures are in ignored `.tools/day4-validation/`.
+
 ## CLI behavior
 
 | Arguments | Standard output | Standard error | Exit code |
@@ -174,6 +178,7 @@ Captured process results are in `target/cli-smoke-results.json` and `target/day2
 | `import-junit <report-path>` with unreadable, malformed, or unsupported input | Empty; no partial import | Source/read/parse diagnostic | `1` |
 | `--report <path>` | Compatibility alias for `import-junit`, with identical output and exit behavior | As above | As above |
 | `import-log <log-path> [--commit <sha>] [--environment <label>]` | Source, SHA-256, metadata, line count, findings and numbered evidence when available | Empty | `0`, even with failure findings |
+| `import-log <log-path> --group` with optional metadata flags | Source and metadata, finding and group totals, representative diagnostics, test identities, and all numbered member evidence | Empty | `0`, even with failure findings |
 | `import-log <log-path>` with an unreadable file or invalid UTF-8 | Empty | Read or decoding diagnostic | `1` |
 | Missing or extra arguments, duplicate log flags, or invalid path syntax | Empty | Usage error and `--help` guidance | `2` |
 | Any unknown argument, including a bare file path | Empty | Unknown argument and `--help` guidance | `2` |
@@ -204,6 +209,18 @@ Put metadata flags after the path in either order. The CLI uses only the supplie
 
 The reader preserves UTF-8 bytes and decoded text. LF and CRLF delimit physical lines, blank lines count, and a final line without a newline keeps its number. The rules match explicit Java, JUnit, and Maven diagnostics, with generic summaries as fallback evidence. Each finding describes what the log shows. See the [supported rules, precedence, and evidence details](docs/LOG_IMPORT.md).
 
+## Group similar findings
+
+Supply the `--group` switch once after the log path, in any order with the metadata flags. Omitting it prints the individual findings.
+
+```powershell
+$sample = 'src/test/resources/fixtures/logs/grouping/grouped-failures.log'
+java -jar target/ci-failure-triage.jar import-log $sample --group --commit abc1234 --environment 'sample CI'
+java -jar target/ci-failure-triage.jar import-log $sample --commit abc1234 --environment 'sample CI'
+```
+
+The fixture yields six findings. The grouped view shows three groups with three assertion, two dependency, and one compilation occurrence. It includes the distinct known test count and marks members with unknown identities. Groups indicate diagnostic similarity. A shared root cause requires further evidence. See the [normalization policy, ID rules, and fixture ranges](docs/GROUPING.md).
+
 ## GitHub Actions CI
 
 `.github/workflows/ci.yml` runs on pushes and pull requests, uses Temurin JDK 17 on `ubuntu-latest`, caches Maven dependencies, and runs exactly:
@@ -223,17 +240,18 @@ Actions are pinned to the verified release commits of [Checkout v7.0.1](https://
 | `src/main/java/com/kunliang/citriage/report/JUnitXmlParser.java` | Secure local XML parser and source-aware diagnostics. |
 | `src/main/java/com/kunliang/citriage/report/TestIdentity.java` | Explicit reported class/test name pair and CLI display name. |
 | `src/main/java/com/kunliang/citriage/report/` models | Immutable source snapshot, report, test result, outcome details, diagnostic position, and parse exception. |
-| `src/main/java/com/kunliang/citriage/log/` | UTF-8 reader, numbered source and finding models, and deterministic rules. |
+| `src/main/java/com/kunliang/citriage/log/` | UTF-8 reader, numbered evidence, classifier, and immutable diagnostic groups. |
 | `src/main/resources/ci-triage.properties` | Version template; Maven replaces `${project.version}` with the POM version. |
 | `src/test/java/com/kunliang/citriage/CiTriageCliTest.java` | JUnit tests for output streams, exit codes, no arguments, and invalid combinations. |
 | `src/test/java/com/kunliang/citriage/report/JUnitXmlParserTest.java` | Tests counts, nesting, decoded evidence, immutability, malformed input, encodings, and blocked external resources. |
-| `src/test/java/com/kunliang/citriage/log/` | Tests physical lines, snapshots, rules, and exact evidence ranges. |
+| `src/test/java/com/kunliang/citriage/log/` | Tests physical lines, snapshots, classification, signature matching, and exact evidence ranges. |
 | `src/test/resources/fixtures/` | Requested Day 2 passing, five-test mixed, nested, malformed, and DOCTYPE fixtures, plus expected observations. |
-| `src/test/resources/fixtures/logs/` | Seven sanitized build and test logs, with their expected findings. |
+| `src/test/resources/fixtures/logs/` | Sanitized build and test logs with expected findings and groups. |
 | `src/test/resources/junit/` | Unchanged earlier fixtures retained for regression coverage. |
 | `.github/workflows/ci.yml` | JDK 17 Maven checks on pushes and pull requests. |
 | `docs/JUNIT_XML_IMPORT.md` | The supported input format, outcome models, evidence semantics, and API example. |
 | `docs/LOG_IMPORT.md` | Log import options, evidence conventions, and classification rules. |
+| `docs/GROUPING.md` | Grouping options, signature normalization, and fixture expectations. |
 | `.gitignore` | Excludes build output, local tools, credentials, SQLite files, and editor/OS temporary files. Deliberately allows sanitized `.log` fixtures. |
 | `AGENTS.md` | Future Codex instructions about scope, existing work, evidence, checks, and handoffs. |
 | `ROADMAP.md` | Later implementation stages and their boundaries. |
@@ -245,7 +263,7 @@ When you run `java -jar`, Java reads `META-INF/MANIFEST.MF` inside the JAR. Mave
 
 For `import-junit` (or its `--report` alias), the call path continues from `run()` to `importReport()`, then `JUnitXmlParser.parse(Path)`. The parser reads a byte snapshot, builds the outcome models, and returns `JUnitReport`. The CLI prints the accepted report and returns `0`; read/parse errors return `1`, and usage errors return `2`. `main()` turns that integer into the process exit status. A failed test inside the report does not itself mean the import failed.
 
-For `import-log`, `run()` validates the path and flags. `LogReader.read(Path)` creates a `BuildLog` snapshot, `LogClassifier.classify()` returns findings with original evidence, and the CLI prints the result.
+For `import-log`, `run()` validates the path and flags. `LogReader.read(Path)` creates a `BuildLog` snapshot and `LogClassifier.classify()` returns findings with original evidence. With `--group`, the CLI passes those findings to `LogGrouper.group()` before formatting. The grouping service uses the Java standard library.
 
 `.tools/` contains ignored local tooling/cache files when the portable setup is used. `target/` contains generated files, including the executable JAR. Neither belongs in the source commit.
 
@@ -259,7 +277,7 @@ git status --short
 git add src docs README.md AGENTS.md ROADMAP.md
 git diff --cached --check
 git diff --cached
-git commit -m "Add local log import and diagnostic rules"
+git commit -m "Group similar log failures"
 
 # Verify the existing destination.
 git remote -v
@@ -267,7 +285,3 @@ git push -u origin HEAD
 ```
 
 Do not overwrite an existing remote. If a separate checkout uses another remote name, use that name in the push command. GitHub authentication must already be configured. If Git asks for an author identity, set your chosen `user.name` and `user.email` before committing.
-
-## After Day 3
-
-Trace a finding from the timeout fixture through the matching rule and its original line range. The next stage groups similar failures while retaining each finding's source evidence.

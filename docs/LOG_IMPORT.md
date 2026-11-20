@@ -6,7 +6,7 @@ Import one local UTF-8 build or test log from the project root after building th
 java -jar target/ci-failure-triage.jar import-log src/test/resources/fixtures/logs/timeout.log --commit abc1234 --environment 'sample CI'
 ```
 
-Supply the path first. Each optional flag accepts one nonblank value and may appear once in either order. Quote paths and labels containing spaces. A filename beginning with `--` can use an explicit relative path such as `.\--example.log`. Metadata comes exclusively from the flags. The CLI displays supplied values as text and uses `unknown` for each omitted value.
+Supply the path first. `--commit` and `--environment` each take one nonblank value. `--group` is a switch. Each flag may appear once after the path, in any order. Quote paths and labels containing spaces. A filename beginning with `--` can use an explicit relative path such as `.\--example.log`. Metadata comes exclusively from the flags. The CLI displays supplied values as text and uses `unknown` for each omitted value.
 
 | Exit | Meaning |
 | --- | --- |
@@ -14,7 +14,7 @@ Supply the path first. Each optional flag accepts one nonblank value and may app
 | `1` | The log could not be read or decoded as UTF-8. The diagnostic goes to stderr. |
 | `2` | The command arguments were invalid. Stderr includes usage guidance. |
 
-The output gives the source path, SHA-256, metadata, line count, and findings. A blank log reports `Evidence unavailable`. A nonblank log with zero matches reports `No failure diagnostics matched`. Findings describe observed diagnostics, and a successful import confirms only that the file was read and decoded.
+The output gives the source path, SHA-256, metadata, line count, and findings. A blank log reports `Evidence unavailable`. A nonblank log with zero matches reports `No failure diagnostics matched`. Findings describe observed diagnostics, and a successful import confirms only that the file was read and decoded. Use `--group` for a diagnostic similarity view that keeps every finding's original numbered evidence. See [grouping](GROUPING.md).
 
 ## Evidence and line numbers
 
@@ -22,7 +22,7 @@ The output gives the source path, SHA-256, metadata, line count, and findings. A
 
 - Line numbers start at 1. LF ends a line, and CR immediately before LF belongs to the CRLF terminator. A standalone CR remains in the line's text.
 - Blank lines count. A final line with text and no newline also counts. A trailing newline closes its line, so `x\n` has one line and `x\n\n` has two. An empty file has zero lines.
-- A leading UTF-8 BOM remains in the original text. Matching uses a separate view that drops the initial BOM, ANSI color sequences, and outer whitespace. Rules also handle recognized severity and exception prefixes on that view.
+- A leading UTF-8 BOM remains in the original text. Classification uses a separate view that drops the initial BOM, ANSI color sequences, and outer whitespace. Rules also handle recognized severity and exception prefixes on that view.
 - `LogEvidence` stores the source snapshot and a consecutive list of original lines. The first and last line numbers are inclusive. `originalText()` includes the original terminators, including the last line's terminator when present.
 - The CLI prefixes each line with its number and displays terminal control characters other than tabs as Unicode escapes. The model retains the literal characters. Source line numbers refer to the imported log. A stack frame such as `InventoryTest.java:31` is part of the log text.
 

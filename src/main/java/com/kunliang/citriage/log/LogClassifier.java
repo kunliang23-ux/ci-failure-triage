@@ -9,16 +9,15 @@ import java.util.regex.Pattern;
 
 import com.kunliang.citriage.report.TestIdentity;
 
+import static com.kunliang.citriage.log.LogDiagnosticText.ERROR_LEVEL;
+import static com.kunliang.citriage.log.LogDiagnosticText.JAVA_NAME;
+import static com.kunliang.citriage.log.LogDiagnosticText.QUALIFIED_NAME;
+import static com.kunliang.citriage.log.LogDiagnosticText.STACK_FRAME;
+import static com.kunliang.citriage.log.LogDiagnosticText.SUREFIRE_TEST;
+import static com.kunliang.citriage.log.LogDiagnosticText.diagnosticText;
+
 /** Recognizes explicit diagnostics and attaches only adjacent, recognizable context. */
 public final class LogClassifier {
-    private static final Pattern ANSI_COLOR = Pattern.compile("\u001b\\[[0-9;:]*m");
-    private static final Pattern ERROR_LEVEL = Pattern.compile("^\\[(?:ERROR|FATAL)]\\s*");
-    private static final String JAVA_NAME = "[A-Za-z_$][\\w$]*";
-    private static final String QUALIFIED_NAME = JAVA_NAME + "(?:\\." + JAVA_NAME + ")*";
-
-    private static final Pattern SUREFIRE_TEST = Pattern.compile(
-            "(" + QUALIFIED_NAME + ")\\.(" + JAVA_NAME + "(?:\\([^)]*\\))?(?:\\[\\d+])?)"
-                    + "\\s+(?:--\\s+)?Time elapsed:\\s+.+?\\s+<<<\\s+(?:FAILURE|ERROR)!?");
     private static final Pattern SUREFIRE_TOTALS = Pattern.compile(
             "Tests run:\\s*\\d+,\\s*Failures:\\s*(\\d+),\\s*Errors:\\s*(\\d+)(?:,.*)?");
     private static final Pattern SUREFIRE_RESULT_ENTRY = Pattern.compile(
@@ -32,7 +31,7 @@ public final class LogClassifier {
     private static final Pattern EXCEPTION_PREFIX = Pattern.compile(
             "^(?:(?:Caused by:|Suppressed:)\\s*|Exception in thread \"[^\"]+\"\\s+)");
     private static final Pattern STACK_CONTEXT = Pattern.compile(
-            "at\\s+[^\\s(]+\\([^)]*\\)|\\.\\.\\.\\s+\\d+\\s+more|(?:Caused by:|Suppressed:)\\s+\\S.*");
+            STACK_FRAME.pattern() + "|(?:Caused by:|Suppressed:)\\s+\\S.*");
     private static final String ASSERTION_TYPE = "(?:(?:java\\.lang\\.)?AssertionError"
             + "|(?:org\\.opentest4j\\.|junit\\.framework\\.)?AssertionFailedError"
             + "|(?:org\\.opentest4j\\.)?MultipleFailuresError"
@@ -71,7 +70,7 @@ public final class LogClassifier {
             "(?:symbol|location|required|found|reason):.*|\\^+");
 
     public List<LogFinding> classify(BuildLog log) {
-        List<String> matchingLines = log.lines().stream().map(LogClassifier::matchingText).toList();
+        List<String> matchingLines = log.lines().stream().map(LogDiagnosticText::matchingText).toList();
         List<LogFinding> findings = new ArrayList<>();
         int start = 0;
         for (int i = 0; i < matchingLines.size(); i++) {
@@ -245,18 +244,6 @@ public final class LogClassifier {
 
     private static boolean positive(String digits) {
         return digits.chars().anyMatch(digit -> digit != '0');
-    }
-
-    private static String matchingText(LogLine line) {
-        String text = line.text();
-        if (line.number() == 1 && text.startsWith("\uFEFF")) {
-            text = text.substring(1);
-        }
-        return ANSI_COLOR.matcher(text).replaceAll("").strip();
-    }
-
-    private static String diagnosticText(String line) {
-        return ERROR_LEVEL.matcher(line).replaceFirst("");
     }
 
     private static LogFinding finding(BuildLog log, Rule rule, int start, int end) {

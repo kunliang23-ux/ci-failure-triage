@@ -5,6 +5,7 @@ import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.stream.Stream;
 
 import org.junit.jupiter.api.Test;
@@ -17,6 +18,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class CiTriageCliTest {
@@ -33,6 +35,7 @@ class CiTriageCliTest {
                 () -> assertTrue(result.out().contains("--report <path>")),
                 () -> assertTrue(result.out().contains("import-junit <report-path>")),
                 () -> assertTrue(result.out().contains("import-log <log-path> [--commit <sha>] [--environment <label>]")),
+                () -> assertTrue(result.out().contains("[--group]")),
                 () -> assertTrue(result.out().contains("JUnit XML")),
                 () -> assertEquals("", result.err()));
     }
@@ -277,6 +280,49 @@ class CiTriageCliTest {
     }
 
     @Test
+    void groupedLogShowsThreeGroupsAndEveryNumberedEvidenceLine() throws Exception {
+        Path input = logFixture("grouping/grouped-failures.log");
+        String path = input.toString();
+        List<String> sourceLines = Files.readAllLines(input);
+        List<String> expectedEvidence = List.of(1, 2, 3, 9, 10, 11, 17, 18, 19, 5, 6, 7, 21, 22, 23, 13, 14, 15)
+                .stream().map(line -> "    " + line + " | " + sourceLines.get(line - 1)).toList();
+        Result grouped = invoke("import-log", path, "--commit", "abc123", "--group", "--environment", "sample CI");
+        Result ungrouped = invoke("import-log", path, "--commit", "abc123", "--environment", "sample CI");
+
+        assertAll(
+                () -> assertEquals(0, grouped.exitCode()),
+                () -> assertEquals("", grouped.err()),
+                () -> assertEquals(0, ungrouped.exitCode()),
+                () -> assertEquals("", ungrouped.err()),
+                () -> assertEquals(ungrouped.out().lines().limit(6).toList(), grouped.out().lines().limit(6).toList()),
+                () -> assertTrue(grouped.out().contains("Commit: abc123")),
+                () -> assertTrue(grouped.out().contains("Environment: sample CI")),
+                () -> assertTrue(grouped.out().contains("Findings: 6")),
+                () -> assertTrue(grouped.out().contains("Groups: 3")),
+                () -> assertTrue(grouped.out().contains("Groups indicate diagnostic similarity. "
+                        + "A shared root cause requires further evidence.")),
+                () -> assertEquals(List.of("ASSERTION_ERROR | occurrences=3", "MISSING_DEPENDENCY | occurrences=2",
+                                "COMPILATION_ERROR | occurrences=1"), grouped.out().lines()
+                        .filter(line -> line.matches("Group g-[0-9a-f]{16} \\| .*"))
+                        .map(line -> line.substring(line.indexOf(" | ") + 3)).toList()),
+                () -> assertTrue(grouped.out().contains("Distinct known tests: 3 | Unknown test occurrences: 0")),
+                () -> assertTrue(grouped.out().contains("Distinct known tests: 0 | Unknown test occurrences: 2")),
+                () -> assertTrue(grouped.out().contains("    org.opentest4j.AssertionFailedError: expected: <42> but was: <41>")),
+                () -> assertTrue(grouped.out().contains("Test: example.CartTest#calculatesTotal")),
+                () -> assertTrue(grouped.out().contains("Test: example.InvoiceTest#roundsTotal")),
+                () -> assertTrue(grouped.out().contains("Test: example.OrderTest#appliesDiscount")),
+                () -> assertTrue(grouped.out().contains("Test: unknown [maven-dependency-resolution]")),
+                () -> assertEquals(expectedEvidence, grouped.out().lines()
+                        .filter(line -> line.matches("    \\d+ \\| .*")).toList()),
+                () -> assertEquals(6, ungrouped.out().lines().filter(line -> line.startsWith("  Evidence: ")).count()),
+                () -> assertFalse(ungrouped.out().contains("Groups:")),
+                () -> assertEquals(grouped,
+                        invoke("import-log", path, "--group", "--environment", "sample CI", "--commit", "abc123")),
+                () -> assertEquals(grouped,
+                        invoke("import-log", path, "--environment", "sample CI", "--commit", "abc123", "--group")));
+    }
+
+    @Test
     void emptyImportedLogReportsUnavailableEvidence(@TempDir Path directory) throws Exception {
         Path path = Files.createFile(directory.resolve("empty.log"));
         Result result = invoke("import-log", path.toString(), "--commit", "abc123");
@@ -289,6 +335,20 @@ class CiTriageCliTest {
                 () -> assertTrue(result.out().contains("Lines: 0")),
                 () -> assertTrue(result.out().contains("Findings: 0")),
                 () -> assertTrue(result.out().contains("Evidence unavailable")));
+    }
+
+    @Test
+    void groupedEmptyAndPassingLogsStillReportZeroFindings(@TempDir Path directory) throws Exception {
+        Result empty = invoke("import-log", Files.createFile(directory.resolve("empty.log")).toString(), "--group");
+        Result passing = invoke("import-log", logFixture("passing.log").toString(), "--group");
+        for (Result result : List.of(empty, passing)) {
+            assertEquals(0, result.exitCode());
+            assertEquals("", result.err());
+            assertTrue(result.out().contains("Findings: 0"));
+            assertTrue(result.out().contains("Groups: 0"));
+        }
+        assertTrue(empty.out().contains("Evidence unavailable"));
+        assertTrue(passing.out().contains("No failure diagnostics matched."));
     }
 
     @Test
@@ -338,6 +398,16 @@ class CiTriageCliTest {
                         "--commit may be specified only once"),
                 Arguments.of(new String[]{"import-log", "missing.log", "--environment", "ci", "--environment", "test"},
                         "--environment may be specified only once"),
+                Arguments.of(new String[]{"import-log", "--group", "missing.log"}, "requires a log file path"),
+                Arguments.of(new String[]{"import-log", "missing.log", "--group", "--commit", "sha", "--group"},
+                        "--group may be specified only once"),
+                Arguments.of(new String[]{"import-log", "missing.log", "--group", "true"}, "Unknown import-log option"),
+                Arguments.of(new String[]{"import-log", "missing.log", "--group=true"}, "Unknown import-log option"),
+                Arguments.of(new String[]{"import-log", "missing.log", "--commit", "--group"}, "--commit requires a value"),
+                Arguments.of(new String[]{"--group"}, "Unknown argument: '--group'"),
+                Arguments.of(new String[]{"--help", "--group"}, "Unknown argument: '--group'"),
+                Arguments.of(new String[]{"import-junit", "missing.xml", "--group"}, "requires exactly one file path"),
+                Arguments.of(new String[]{"--report", "missing.xml", "--group"}, "requires exactly one file path"),
                 Arguments.of(new String[]{"import-log", "invalid\u0000path.log"}, "Invalid log path"),
                 Arguments.of(new String[]{"--help", "import-log"}, "Choose only one argument"));
     }

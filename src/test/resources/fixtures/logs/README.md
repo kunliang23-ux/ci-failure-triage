@@ -11,5 +11,6 @@ All names, errors, source paths, repository names, and timings are invented. Lin
 | `unknown.log` | `UNKNOWN` from `unclassified-error`, line 2. The error line provides evidence of a failure with insufficient detail to classify it further. |
 | `passing.log` | Zero findings. The passing test's timeout configuration is informational. |
 | `mixed.log` | `ASSERTION_ERROR` on lines 2–4, `MISSING_DEPENDENCY` on line 6, `UNKNOWN` on line 7, and `COMPILATION_ERROR` on line 9. The build summary adds no finding. |
+| `grouping/grouped-failures.log` | Six findings form three groups. The assertion group contains `example.CartTest#calculatesTotal` (1–3), `example.InvoiceTest#roundsTotal` (9–11), and `example.OrderTest#appliesDiscount` (17–19). The dependency group contains 5–7 and 21–23. The compiler group contains 13–15. Both build diagnostic groups have zero known tests. |
 
 Tests create additional temporary inputs for raw UTF-8 bytes, LF and CRLF, empty logs, missing files, and filenames containing spaces. Keep checked-in fixtures free of personal paths and credentials.
