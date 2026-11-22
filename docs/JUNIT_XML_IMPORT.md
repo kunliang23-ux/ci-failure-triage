@@ -10,9 +10,9 @@ After `mvn package` or `mvn clean verify`, run from the project root:
 java -jar target/ci-failure-triage.jar import-junit src/test/resources/fixtures/mixed-results.xml
 ```
 
-The invented report yields `Tests: 5 | passed=2 failed=1 errors=1 skipped=1`. `Tests` is the total execution count; `errors` counts errored executions. The CLI prints the source path, snapshot SHA-256, test class/name, available durations in seconds, messages, types, detail text, and XML diagnostic positions. Quote paths containing spaces. The earlier `--report <path>` command remains a compatibility alias with the same output and exit codes.
+The invented report yields `Tests: 5 | passed=2 failed=1 errors=1 skipped=1`. `Tests` is the total execution count; `errors` counts errored executions. The CLI prints the source path, snapshot SHA-256, test class/name, available durations in seconds, messages, types, detail text, and XML diagnostic positions. Quote paths containing spaces. `--report <path>` is the compatibility alias for this in-memory import. To save the report, use `import-junit <path> --db <database-path>` with an optional `--run-id <id>`. See [SQLite storage](STORAGE.md).
 
-Exit `0` means the report was imported, including reports containing failed tests. Exit `1` means reading or parsing failed; no partial result is printed. Exit `2` means the command's arguments were invalid. All imports are local and read-only.
+Exit `0` means the report was imported, including reports containing failed tests. Exit `1` means reading, parsing, or saving to the requested database failed. Exit `2` means the command's arguments were invalid. Imports read the original XML file without modifying it.
 
 ## Supported structures
 
@@ -51,7 +51,7 @@ Parsed fields are a separate view. XML processing decodes entities and normalize
 
 The SAX Locator reports approximate diagnostic positions at the end of an event. We snapshot a testcase/detail position when its opening-tag event is delivered. For a multiline opening tag, its line is typically where that tag ends. Use the original bytes as authoritative XML evidence. The [log importer](LOG_IMPORT.md) provides exact line ranges for its own text input. See the [SAX Locator contract](https://docs.oracle.com/en/java/javase/17/docs/api/java.xml/org/xml/sax/Locator.html).
 
-The returned report retains its snapshot in memory; a parse exception retains rejected bytes too. The CLI prints the hash and leaves the source file intact. It does not create a durable evidence archive or database, and a hash is not a replacement for the report itself. Whole reports currently reside in memory; large-file streaming and import quotas are not implemented.
+The returned report retains its snapshot in memory, and a parse exception retains rejected bytes too. With `--db`, the accepted snapshot and parsed results are also saved for later review. The parser loads the whole report into memory.
 
 ## XML resource handling
 

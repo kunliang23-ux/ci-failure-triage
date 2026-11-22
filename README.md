@@ -4,7 +4,7 @@ A Java portfolio project to help developers answer:
 
 > Why did my tests fail, and what should I investigate first?
 
-**Days 1–4 of the 15-day plan are implemented.** The CLI imports local JUnit XML reports and classifies diagnostics in local UTF-8 logs. It can group similar log findings while preserving original source bytes and each finding's exact numbered evidence. GitHub Actions builds and tests on pushes and pull requests. See the [XML input contract](docs/JUNIT_XML_IMPORT.md), [log import contract](docs/LOG_IMPORT.md), [grouping rules](docs/GROUPING.md), and [roadmap](ROADMAP.md).
+**Days 1–5 of the 15-day plan are implemented.** The CLI imports local JUnit XML reports, classifies and groups log diagnostics, and can save entire runs to SQLite. Saved runs retain original source bytes and numbered log evidence. GitHub Actions builds and tests on pushes and pull requests. See the [XML input contract](docs/JUNIT_XML_IMPORT.md), [log import contract](docs/LOG_IMPORT.md), [grouping rules](docs/GROUPING.md), [storage contract](docs/STORAGE.md), and [roadmap](ROADMAP.md).
 
 ## Requirements and versions
 
@@ -13,7 +13,7 @@ A Java portfolio project to help developers answer:
 - Git for source control and a GitHub account for publishing.
 - Internet access for the first Maven dependency download. The built CLI itself works offline.
 
-`pom.xml` targets Java 17 with `maven.compiler.release`. JUnit Jupiter 5.13.4 is test-only; there are no runtime dependencies. The active build plugins are pinned: Clean 3.4.1, Resources 3.3.1, Compiler 3.14.1, Surefire 3.5.4, and JAR 3.4.2. These are stable releases, rather than previews. See the [JUnit release notes](https://docs.junit.org/5.13.4/release-notes/), [Compiler requirements](https://maven.apache.org/plugins-archives/maven-compiler-plugin-3.14.1/plugin-info.html), [Surefire requirements](https://maven.apache.org/surefire-archives/surefire-3.5.4/maven-surefire-plugin/plugin-info.html), and [JAR requirements](https://maven.apache.org/plugins-archives/maven-jar-plugin-3.4.2/plugin-info.html).
+`pom.xml` targets Java 17 with `maven.compiler.release`. JUnit Jupiter 5.13.4 is test-only. Xerial SQLite JDBC 3.54.1.0 supplies the runtime driver. Maven Shade 3.6.2 bundles it in the executable JAR. The other build plugins are pinned to Clean 3.4.1, Resources 3.3.1, Compiler 3.14.1, Surefire 3.5.4, and JAR 3.4.2. See the [SQLite JDBC release](https://github.com/xerial/sqlite-jdbc/releases/tag/3.54.1.0), [Maven Shade requirements](https://maven.apache.org/plugins-archives/maven-shade-plugin-3.6.2/plugin-info.html), and [JUnit release notes](https://docs.junit.org/5.13.4/release-notes/).
 
 ## Windows PowerShell setup
 
@@ -111,7 +111,7 @@ These are ordered phases in Maven's default build lifecycle. Calling a later pha
 | Command | Work performed in this project | Output |
 | --- | --- | --- |
 | `mvn test` | Copy/filter application resources, compile Java, copy test fixtures without filtering, compile tests, and run JUnit through Surefire. | `target/classes/`, `target/test-classes/`, and `target/surefire-reports/`. A new JAR is not created. |
-| `mvn package` | Everything through `test`, then the JAR plugin packages compiled application classes and resources and writes the manifest entry point. | `target/ci-failure-triage.jar`. Test fixtures and JUnit dependencies are excluded. |
+| `mvn package` | Everything through `test`, then packages the application, runtime driver, JDBC services, native resources, and migrations in a runnable JAR. | `target/ci-failure-triage.jar`. Test fixtures and JUnit dependencies are excluded. |
 | `mvn verify` | Everything through `package`, then any checks bound to later verification phases. | The packaged JAR after the configured lifecycle checks succeed. |
 
 This POM has no Failsafe integration-test or additional verification-plugin bindings yet. `verify` reaches the later phases, but does not invent extra tests, launch the CLI, or contact GitHub. That is why the packaged CLI is demonstrated separately. `clean` is a separate lifecycle: `mvn clean verify` removes old `target/` output first and rebuilds through `verify`. A plain `mvn test` may leave an older JAR in place; package again before running changed code.
@@ -168,6 +168,10 @@ Captured process results are in `target/cli-smoke-results.json` and `target/day2
 
 `mvn test` and `mvn clean verify` each passed 153 tests with Java 17 and Maven 3.9.16, using the existing local cache in offline mode. The 27 packaged CLI checks covered the grouped fixture, repeatable IDs and ordering, byte-for-byte Day 3 compatibility for eight ungrouped log runs, JUnit import and its `--report` alias, and stdout, stderr, and exit codes. The Maven logs and packaged process captures are in ignored `.tools/day4-validation/`.
 
+## Day 5 validation results
+
+With Java 17 and Maven 3.9.16, `mvn test` and `mvn clean verify` each passed 183 tests. The final builds used the project-local cache in offline mode after the initial dependency download. Twenty-four packaged command checks passed, including saving XML and a grouped log into one run, byte-identical run summaries after repeat imports, and reopening numbered evidence after deleting temporary source copies. Seven compatibility checks matched the Day 4 JAR's exit codes and output streams byte for byte. All 18 checked-in XML and log fixture hashes were verified after the demonstrations. Build logs and captures are in ignored `.tools/day5-validation/`.
+
 ## CLI behavior
 
 | Arguments | Standard output | Standard error | Exit code |
@@ -180,6 +184,10 @@ Captured process results are in `target/cli-smoke-results.json` and `target/day2
 | `import-log <log-path> [--commit <sha>] [--environment <label>]` | Source, SHA-256, metadata, line count, findings and numbered evidence when available | Empty | `0`, even with failure findings |
 | `import-log <log-path> --group` with optional metadata flags | Source and metadata, finding and group totals, representative diagnostics, test identities, and all numbered member evidence | Empty | `0`, even with failure findings |
 | `import-log <log-path>` with an unreadable file or invalid UTF-8 | Empty | Read or decoding diagnostic | `1` |
+| `import-junit <path> --db <database-path>` or `import-log <path> --db <database-path>` | Run ID, save status, and the imported results. Supply `--run-id <id>` to attach to a specific execution. | Empty | `0` |
+| `runs --db <database-path>` | Saved run IDs, import times, metadata, and separate XML and log totals | Empty | `0` |
+| `show-run <id> --db <database-path> [--group]` | Stored metadata, JUnit outcomes, and original log evidence | Empty | `0` |
+| Database error, conflicting metadata, missing database on a query, or missing run | Empty | Database or missing-run diagnostic | `1` |
 | Missing or extra arguments, duplicate log flags, or invalid path syntax | Empty | Usage error and `--help` guidance | `2` |
 | Any unknown argument, including a bare file path | Empty | Unknown argument and `--help` guidance | `2` |
 | Multiple operations, including repeated flags | Empty | Choose one operation and `--help` guidance | `2` |
@@ -221,6 +229,20 @@ java -jar target/ci-failure-triage.jar import-log $sample --commit abc1234 --env
 
 The fixture yields six findings. The grouped view shows three groups with three assertion, two dependency, and one compilation occurrence. It includes the distinct known test count and marks members with unknown identities. Groups indicate diagnostic similarity. A shared root cause requires further evidence. See the [normalization policy, ID rules, and fixture ranges](docs/GROUPING.md).
 
+## Save and reopen a run
+
+Use the same run ID when the XML report and log belong to one execution. Both commands also accept `--commit` and `--environment` when saving.
+
+```powershell
+$db = 'target/triage-demo.sqlite'
+java -jar target/ci-failure-triage.jar import-junit src/test/resources/fixtures/mixed-results.xml --db $db --run-id demo
+java -jar target/ci-failure-triage.jar import-log src/test/resources/fixtures/logs/grouping/grouped-failures.log --db $db --run-id demo --group
+java -jar target/ci-failure-triage.jar runs --db $db
+java -jar target/ci-failure-triage.jar show-run demo --db $db --group
+```
+
+The database stores each source's bytes, SHA-256, and parsed results. Repeating the same source kind and hash within `demo` keeps a single copy of that artifact. A different run ID preserves a separate execution. Imports with `--db` and an omitted run ID generate a fresh UUID. For schema details and a demonstration using removable input copies, see [SQLite storage](docs/STORAGE.md).
+
 ## GitHub Actions CI
 
 `.github/workflows/ci.yml` runs on pushes and pull requests, uses Temurin JDK 17 on `ubuntu-latest`, caches Maven dependencies, and runs exactly:
@@ -235,16 +257,19 @@ Actions are pinned to the verified release commits of [Checkout v7.0.1](https://
 
 | File | Purpose |
 | --- | --- |
-| `pom.xml` | Java 17 target, application version, test dependency, pinned plugins, fixed JAR name, and manifest entry point. |
-| `src/main/java/com/kunliang/citriage/CiTriageCli.java` | `main()`, argument handling, report and log output, and version loading. |
+| `pom.xml` | Java 17 target, dependencies, pinned plugins, and standalone JAR packaging. |
+| `src/main/java/com/kunliang/citriage/CiTriageCli.java` | Entry point, options, import and query output, and version loading. |
 | `src/main/java/com/kunliang/citriage/report/JUnitXmlParser.java` | Secure local XML parser and source-aware diagnostics. |
 | `src/main/java/com/kunliang/citriage/report/TestIdentity.java` | Explicit reported class/test name pair and CLI display name. |
 | `src/main/java/com/kunliang/citriage/report/` models | Immutable source snapshot, report, test result, outcome details, diagnostic position, and parse exception. |
 | `src/main/java/com/kunliang/citriage/log/` | UTF-8 reader, numbered evidence, classifier, and immutable diagnostic groups. |
+| `src/main/java/com/kunliang/citriage/storage/` | SQLite repository, schema migration loader, saved run models, and observation mapping. |
+| `src/main/resources/db/migrations/` | Ordered SQLite schema migrations. |
 | `src/main/resources/ci-triage.properties` | Version template; Maven replaces `${project.version}` with the POM version. |
 | `src/test/java/com/kunliang/citriage/CiTriageCliTest.java` | JUnit tests for output streams, exit codes, no arguments, and invalid combinations. |
 | `src/test/java/com/kunliang/citriage/report/JUnitXmlParserTest.java` | Tests counts, nesting, decoded evidence, immutability, malformed input, encodings, and blocked external resources. |
 | `src/test/java/com/kunliang/citriage/log/` | Tests physical lines, snapshots, classification, signature matching, and exact evidence ranges. |
+| `src/test/java/com/kunliang/citriage/storage/` and `CiTriageStorageCliTest.java` | File-backed repository and CLI storage tests. |
 | `src/test/resources/fixtures/` | Requested Day 2 passing, five-test mixed, nested, malformed, and DOCTYPE fixtures, plus expected observations. |
 | `src/test/resources/fixtures/logs/` | Sanitized build and test logs with expected findings and groups. |
 | `src/test/resources/junit/` | Unchanged earlier fixtures retained for regression coverage. |
@@ -252,18 +277,21 @@ Actions are pinned to the verified release commits of [Checkout v7.0.1](https://
 | `docs/JUNIT_XML_IMPORT.md` | The supported input format, outcome models, evidence semantics, and API example. |
 | `docs/LOG_IMPORT.md` | Log import options, evidence conventions, and classification rules. |
 | `docs/GROUPING.md` | Grouping options, signature normalization, and fixture expectations. |
+| `docs/STORAGE.md` | Storage commands, run identity, migrations, and evidence semantics. |
 | `.gitignore` | Excludes build output, local tools, credentials, SQLite files, and editor/OS temporary files. Deliberately allows sanitized `.log` fixtures. |
 | `AGENTS.md` | Future Codex instructions about scope, existing work, evidence, checks, and handoffs. |
 | `ROADMAP.md` | Later implementation stages and their boundaries. |
 | `README.md` | Project explanation, setup, commands, and handoff guidance. |
 
-When you run `java -jar`, Java reads `META-INF/MANIFEST.MF` inside the JAR. Maven's JAR plugin writes `Main-Class: com.kunliang.citriage.CiTriageCli` there. Java calls `public static void main(String[] args)` on that class. `main()` passes the arguments and console streams to `run()`, then uses its return value as the process exit code.
+When you run `java -jar`, Java reads `META-INF/MANIFEST.MF` inside the JAR. Maven Shade writes `Main-Class: com.kunliang.citriage.CiTriageCli` there and preserves the JDBC driver service entry. Java calls `public static void main(String[] args)` on that class. `main()` passes the arguments and console streams to `run()`, then uses its return value as the process exit code.
 
-`run()` returns an integer and never exits the JVM. Tests call it with in-memory streams, so argument errors cannot terminate JUnit. Maven filters the version resource before tests and packaging, keeping the application's version in `pom.xml`; the version test checks the expected release string. The plain JAR is sufficient because the CLI has no runtime dependencies.
+`run()` returns an integer and leaves the JVM running for its caller. Tests call it with in-memory streams. Maven filters the version resource before tests and packaging, keeping the application's version in `pom.xml`. The version test checks the expected release string.
 
 For `import-junit` (or its `--report` alias), the call path continues from `run()` to `importReport()`, then `JUnitXmlParser.parse(Path)`. The parser reads a byte snapshot, builds the outcome models, and returns `JUnitReport`. The CLI prints the accepted report and returns `0`; read/parse errors return `1`, and usage errors return `2`. `main()` turns that integer into the process exit status. A failed test inside the report does not itself mean the import failed.
 
 For `import-log`, `run()` validates the path and flags. `LogReader.read(Path)` creates a `BuildLog` snapshot and `LogClassifier.classify()` returns findings with original evidence. With `--group`, the CLI passes those findings to `LogGrouper.group()` before formatting. The grouping service uses the Java standard library.
+
+With `--db`, the CLI saves the accepted import through `SqliteRunRepository` before printing success. The repository stores groups for every saved log. `runs` queries summaries without reading the source BLOBs. `show-run` loads saved observations and reconstructs numbered excerpts from the stored bytes.
 
 `.tools/` contains ignored local tooling/cache files when the portable setup is used. `target/` contains generated files, including the executable JAR. Neither belongs in the source commit.
 
@@ -274,10 +302,10 @@ Use the checkout's existing `origin` remote. Verify its URL with `git remote -v`
 ```powershell
 # Review the files and stage only project sources/documentation.
 git status --short
-git add src docs README.md AGENTS.md ROADMAP.md
+git add src docs README.md AGENTS.md ROADMAP.md pom.xml
 git diff --cached --check
 git diff --cached
-git commit -m "Group similar log failures"
+git commit -m "Persist triage runs and evidence in SQLite"
 
 # Verify the existing destination.
 git remote -v

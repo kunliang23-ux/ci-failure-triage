@@ -12,6 +12,8 @@ java -jar target/ci-failure-triage.jar import-log $sample --commit abc1234 --env
 
 Each occurrence is one classified finding. The distinct known test count uses the exact class and test name pair. Multiple findings for one test still count as multiple occurrences. Each member without an explicit test identity displays `unknown` and contributes to the unknown test occurrence count.
 
+SQLite log imports save these groups even when the import displays individual findings. `show-run <id> --db <database-path> --group` displays the saved groups and evidence for each source. Display IDs are scoped to the source. See [SQLite storage](STORAGE.md).
+
 ## Normalization and matching
 
 `LogGrouper` accepts findings from a single imported log snapshot. The group model keeps every original `LogFinding` and its `LogEvidence`. The signature is a separate string derived from the evidence and serves as the representative diagnostic.

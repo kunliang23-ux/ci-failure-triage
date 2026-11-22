@@ -11,10 +11,12 @@ Supply the path first. `--commit` and `--environment` each take one nonblank val
 | Exit | Meaning |
 | --- | --- |
 | `0` | Import succeeded. This includes empty logs and logs containing failure findings. |
-| `1` | The log could not be read or decoded as UTF-8. The diagnostic goes to stderr. |
+| `1` | Reading, UTF-8 decoding, or saving to the requested database failed. The diagnostic goes to stderr. |
 | `2` | The command arguments were invalid. Stderr includes usage guidance. |
 
 The output gives the source path, SHA-256, metadata, line count, and findings. A blank log reports `Evidence unavailable`. A nonblank log with zero matches reports `No failure diagnostics matched`. Findings describe observed diagnostics, and a successful import confirms only that the file was read and decoded. Use `--group` for a diagnostic similarity view that keeps every finding's original numbered evidence. See [grouping](GROUPING.md).
+
+To save the classified log and its groups, add `--db <database-path>` and optionally `--run-id <id>` after the path. Use `show-run` to read saved evidence. See [SQLite storage](STORAGE.md).
 
 ## Evidence and line numbers
 
@@ -26,7 +28,7 @@ The output gives the source path, SHA-256, metadata, line count, and findings. A
 - `LogEvidence` stores the source snapshot and a consecutive list of original lines. The first and last line numbers are inclusive. `originalText()` includes the original terminators, including the last line's terminator when present.
 - The CLI prefixes each line with its number and displays terminal control characters other than tabs as Unicode escapes. The model retains the literal characters. Source line numbers refer to the imported log. A stack frame such as `InventoryTest.java:31` is part of the log text.
 
-The log snapshot lives in memory for the import. Keep the source file for later use. A hash identifies the bytes and can be compared with a later copy.
+The snapshot lives in memory during import. With `--db`, the same bytes and their hash remain available in the saved run.
 
 ## Supported rules
 

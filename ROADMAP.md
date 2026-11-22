@@ -1,7 +1,7 @@
 # CI Failure Triage roadmap
 
 The product question is: **Why did my tests fail, and what should I investigate first?**
-The 15-day plan advances in small, testable stages. Java 17 and Maven remain the backend foundation, and JUnit supplies automated tests. Days 1–4 are implemented. Stages 5 onward describe future work. See [JUnit XML import](docs/JUNIT_XML_IMPORT.md), [log import](docs/LOG_IMPORT.md), and [failure grouping](docs/GROUPING.md).
+The 15-day plan advances in small, testable stages. Java 17 and Maven remain the backend foundation, and JUnit supplies automated tests. Days 1–5 are implemented. Day 6 starts compatible baseline comparison. See [JUnit XML import](docs/JUNIT_XML_IMPORT.md), [log import](docs/LOG_IMPORT.md), [failure grouping](docs/GROUPING.md), and [SQLite storage](docs/STORAGE.md).
 
 ## Day 1: scaffold and CLI
 
@@ -11,7 +11,7 @@ The 15-day plan advances in small, testable stages. Java 17 and Maven remain the
 
 ## Day 2: import JUnit XML locally and add basic CI (implemented)
 
-- [x] Introduce small immutable models for a report, explicit test identities/suite paths, outcomes, optional decimal durations in seconds, and original outcome details. Full run/commit/environment metadata remains later work.
+- [x] Introduce small immutable models for a report, explicit test identities/suite paths, outcomes, optional decimal durations in seconds, and original outcome details.
 - [x] Add `import-junit <report-path>` and preserve the earlier `--report <path>` compatibility alias, help, version, and argument behavior.
 - [x] Parse local JUnit XML using Java XML APIs with external entities and external DTD access disabled.
 - [x] Handle single suites, nested suites, failures, errors, skipped tests, and malformed input explicitly.
@@ -19,7 +19,7 @@ The 15-day plan advances in small, testable stages. Java 17 and Maven remain the
 - [x] Test sanitized fixtures in `src/test/resources/fixtures`, including a mixed report with 5 executions (2 passed, 1 failed, 1 errored, 1 skipped), nested suites, malformed XML, and a rejected DOCTYPE. Retain earlier fixtures as regressions.
 - [x] Add `.github/workflows/ci.yml` to run `mvn --batch-mode clean verify` on JDK 17 for pushes and pull requests, using verified supported Action releases pinned to commit SHAs. GitHub-hosted execution starts after the workflow is pushed.
 
-Acceptance: a local report produces accurate test outcomes and useful diagnostics without storage, AI, or a web interface.
+Acceptance: a local report produces accurate test outcomes and useful diagnostics from the CLI.
 
 ## Day 3: logs and deterministic classification (implemented)
 
@@ -36,20 +36,24 @@ Acceptance: a local report produces accurate test outcomes and useful diagnostic
 - [x] Show stable IDs, occurrence counts, distinct known tests, unknown identities, and every member's original numbered evidence.
 - [x] Verify grouping and meaningful differences with a six-finding, three-group fixture and Java 17 tests.
 
-## Stage 5: persistence and compatible baselines
+## Day 5: SQLite persistence (implemented)
 
-- Add SQLite through JDBC, with a small repository layer, prepared statements, schema migrations, and transactional imports.
-- Store runs, test executions, metadata, and evidence provenance without changing CLI/domain contracts unnecessarily.
+- [x] Add versioned SQLite migrations, foreign keys, prepared statements, and transactional imports behind a repository.
+- [x] Save source snapshots, JUnit executions, log findings, groups, and explicit metadata. Deduplicate an artifact within its run while preserving separate executions.
+- [x] List saved runs and read stored results and numbered evidence from the packaged JAR.
+
+## Day 6: compatible baselines
+
 - Compare a failed run with an earlier passing run only when repository, suite, environment, and relevant runtime/configuration metadata are compatible.
 - Report why a baseline was chosen, or why no compatible baseline exists. Missing compatibility data must not silently imply a match.
 
-## Stage 6: inconsistent repeated outcomes
+## Later: inconsistent repeated outcomes
 
 - Link repeated executions by test identity and compatible execution context.
 - Show observed pass/fail changes with execution counts and evidence.
 - Describe the observation as an inconsistent outcome. A single failure or an incompatible environment does not establish flakiness or a root cause.
 
-## Stage 7: AI explanations and evaluation
+## Later: AI explanations and evaluation
 
 - Place optional AI integration behind an interface; obtain credentials from the environment.
 - Give explanations only from supplied evidence and require citations to exact log lines.
@@ -58,12 +62,12 @@ Acceptance: a local report produces accurate test outcomes and useful diagnostic
 - Build a labeled, sanitized evaluation set with a held-out portion. Compare rules-only and AI-assisted classification, grouping, unsupported claims, citation accuracy, and abstention behavior.
 - Record costs and latency alongside accuracy; document limits before claiming improvements.
 
-## Stage 8: web API
+## Later: web API
 
 - Add Spring Boot around established services for import, run details, groups, comparisons, and explanations.
 - Define request validation, pagination, actionable errors, and tests. Keep domain logic independent of HTTP.
 
-## Stage 9: dashboard and GitHub importing
+## Later: dashboard and GitHub importing
 
 - Build a React and TypeScript dashboard for runs, test names, errors, commit SHAs, environments, failure groups, comparisons, and cited evidence.
 - Show unknowns and insufficient evidence clearly. Let developers trace explanations back to source lines.
