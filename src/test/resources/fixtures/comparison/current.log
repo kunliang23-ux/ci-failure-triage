@@ -1,0 +1,18 @@
+[ERROR] example.CheckoutTest.A -- Time elapsed: 0.011 s <<< FAILURE!
+org.opentest4j.AssertionFailedError: expected: <42> but was: <41>
+    at example.CheckoutTest.A(CheckoutTest.java:17)
+
+[ERROR] Could not resolve dependencies for project example:checkout:jar:1.0
+[ERROR] dependency: example:sample-library:jar:1.2.0 (test)
+[ERROR] Could not find artifact example:sample-library:jar:1.2.0 in fixture repository
+
+[ERROR] example.CheckoutTest.D -- Time elapsed: 0.012 s <<< FAILURE!
+org.opentest4j.AssertionFailedError: expected: <42> but was: <41>
+    at example.CheckoutTest.D(CheckoutTest.java:38)
+
+[ERROR] example.CheckoutTest.A -- Time elapsed: 0.011 s <<< FAILURE!
+org.opentest4j.AssertionFailedError: expected: <42> but was: <41>
+    at example.CheckoutTest.A(CheckoutTest.java:17)
+
+[ERROR] The fixture verification step failed unexpectedly
+[INFO] BUILD FAILURE

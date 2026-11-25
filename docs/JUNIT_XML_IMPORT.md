@@ -10,7 +10,7 @@ After `mvn package` or `mvn clean verify`, run from the project root:
 java -jar target/ci-failure-triage.jar import-junit src/test/resources/fixtures/mixed-results.xml
 ```
 
-The invented report yields `Tests: 5 | passed=2 failed=1 errors=1 skipped=1`. `Tests` is the total execution count; `errors` counts errored executions. The CLI prints the source path, snapshot SHA-256, test class/name, available durations in seconds, messages, types, detail text, and XML diagnostic positions. Quote paths containing spaces. `--report <path>` is the compatibility alias for this in-memory import. To save the report, use `import-junit <path> --db <database-path>` with an optional `--run-id <id>`. See [SQLite storage](STORAGE.md).
+The invented report yields `Tests: 5 | passed=2 failed=1 errors=1 skipped=1`. `Tests` is the total execution count, and `errors` counts errored executions. The CLI prints the source filename, snapshot SHA-256, test class/name, available durations in seconds, messages, types, detail text, and XML diagnostic positions. It masks recognized home-directory prefixes in displayed diagnostics. Quote paths containing spaces. `--report <path>` is the compatibility alias for this in-memory import. To save the report, use `import-junit <path> --db <database-path>` with an optional `--run-id <id>`. See [SQLite storage](STORAGE.md).
 
 Exit `0` means the report was imported, including reports containing failed tests. Exit `1` means reading, parsing, or saving to the requested database failed. Exit `2` means the command's arguments were invalid. Imports read the original XML file without modifying it.
 
@@ -61,9 +61,9 @@ Secure processing is enabled. DOCTYPE declarations are rejected, external genera
 
 ```java
 import java.nio.file.Path;
-import com.kunliang.citriage.report.JUnitReport;
-import com.kunliang.citriage.report.JUnitXmlParser;
-import com.kunliang.citriage.report.TestCaseResult;
+import org.citriage.report.JUnitReport;
+import org.citriage.report.JUnitXmlParser;
+import org.citriage.report.TestCaseResult;
 
 JUnitReport report = new JUnitXmlParser().parse(Path.of("report.xml"));
 for (TestCaseResult test : report.testCases()) {

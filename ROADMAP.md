@@ -1,7 +1,7 @@
 # CI Failure Triage roadmap
 
 The product question is: **Why did my tests fail, and what should I investigate first?**
-The 15-day plan advances in small, testable stages. Java 17 and Maven remain the backend foundation, and JUnit supplies automated tests. Days 1–5 are implemented. Day 6 starts compatible baseline comparison. See [JUnit XML import](docs/JUNIT_XML_IMPORT.md), [log import](docs/LOG_IMPORT.md), [failure grouping](docs/GROUPING.md), and [SQLite storage](docs/STORAGE.md).
+The 15-day plan advances in small, testable stages. Java 17 and Maven remain the backend foundation, and JUnit supplies automated tests. Days 1–6 are implemented. See [JUnit XML import](docs/JUNIT_XML_IMPORT.md), [log import](docs/LOG_IMPORT.md), [failure grouping](docs/GROUPING.md), [SQLite storage](docs/STORAGE.md), and [baseline comparison](docs/COMPARISON.md).
 
 ## Day 1: scaffold and CLI
 
@@ -42,10 +42,12 @@ Acceptance: a local report produces accurate test outcomes and useful diagnostic
 - [x] Save source snapshots, JUnit executions, log findings, groups, and explicit metadata. Deduplicate an artifact within its run while preserving separate executions.
 - [x] List saved runs and read stored results and numbered evidence from the packaged JAR.
 
-## Day 6: compatible baselines
+## Day 6: compatible baselines and investigation priorities (implemented)
 
-- Compare a failed run with an earlier passing run only when repository, suite, environment, and relevant runtime/configuration metadata are compatible.
-- Report why a baseline was chosen, or why no compatible baseline exists. Missing compatibility data must not silently imply a match.
+- [x] Accept explicit execution metadata from a UTF-8 properties file with transactional validation and conflict handling.
+- [x] Select or validate a compatible completed passing baseline from stored observations. Report selection and exclusion reasons using execution chronology and exact known configuration matches.
+- [x] Identify new, unseen, skipped-baseline, ambiguous, and missing test observations. Keep repeated executions and evidence available.
+- [x] Rank investigation priorities using supported build diagnostics, confirmed new failures, and distinct named tests. Keep priorities available without a compatible baseline.
 
 ## Later: inconsistent repeated outcomes
 

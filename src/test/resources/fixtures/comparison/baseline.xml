@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="checkout-unit" tests="3">
+    <testcase classname="example.CheckoutTest" name="A" time="0.010"/>
+    <testcase classname="example.CheckoutTest" name="B" time="0.008"/>
+    <testcase classname="example.CheckoutTest" name="C" time="0.009"/>
+</testsuite>

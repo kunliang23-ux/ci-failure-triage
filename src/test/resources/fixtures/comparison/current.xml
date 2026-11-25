@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="checkout-unit" tests="3" failures="2">
+    <testcase classname="example.CheckoutTest" name="A" time="0.011">
+        <failure type="org.opentest4j.AssertionFailedError" message="expected: &lt;42&gt; but was: &lt;41&gt;">at example.CheckoutTest.A(CheckoutTest.java:17)</failure>
+    </testcase>
+    <testcase classname="example.CheckoutTest" name="B" time="0.008"/>
+    <testcase classname="example.CheckoutTest" name="D" time="0.012">
+        <failure type="org.opentest4j.AssertionFailedError" message="expected: &lt;42&gt; but was: &lt;41&gt;">at example.CheckoutTest.D(CheckoutTest.java:38)</failure>
+    </testcase>
+</testsuite>
