@@ -2,6 +2,8 @@
 /target/
 /.tools/
 /.m2/
+/.ci-triage-staging/
+/ci-triage-bundle/
 *.class
 *.jar
 

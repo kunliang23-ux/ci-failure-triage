@@ -207,7 +207,7 @@ class SqliteRunRepositoryTest {
     void freshSchemaHasForeignKeysOnBothReadAndWriteConnections() throws Exception {
         SqliteDatabase database = new SqliteDatabase(databasePath());
         database.transaction(true, connection -> {
-            assertEquals(2, pragma(connection, "PRAGMA user_version"));
+            assertEquals(3, pragma(connection, "PRAGMA user_version"));
             assertEquals(1, pragma(connection, "PRAGMA foreign_keys"));
             try (var insert = connection.prepareStatement("""
                     INSERT INTO run_metadata (run_id, field, value) VALUES ('missing', 'COMMIT', 'abc1234')
@@ -217,7 +217,7 @@ class SqliteRunRepositoryTest {
             return null;
         });
         database.transaction(false, connection -> {
-            assertEquals(2, pragma(connection, "PRAGMA user_version"));
+            assertEquals(3, pragma(connection, "PRAGMA user_version"));
             assertEquals(1, pragma(connection, "PRAGMA foreign_keys"));
             assertTrue(connection.isReadOnly());
             return null;
@@ -228,7 +228,7 @@ class SqliteRunRepositoryTest {
     void failedInitialTransactionCanRetryTheMigration() throws Exception {
         SqliteDatabase database = new SqliteDatabase(databasePath());
         assertThrows(SQLException.class, () -> database.transaction(true, connection -> {
-            assertEquals(2, pragma(connection, "PRAGMA user_version"));
+            assertEquals(3, pragma(connection, "PRAGMA user_version"));
             throw new SQLException("simulated failure after migration");
         }));
         assertTrue(repository().saveReport(RUN_ID, UNKNOWN, report()).inserted());
@@ -296,7 +296,7 @@ class SqliteRunRepositoryTest {
         assertSource(report.source(), migrated.reports().get(0).report().source());
         assertEquals(report.testCases(), migrated.reports().get(0).report().testCases());
         int version = new SqliteDatabase(databasePath()).transaction(false, connection -> pragma(connection, "PRAGMA user_version"));
-        assertEquals(2, version);
+        assertEquals(3, version);
     }
 
     @Test

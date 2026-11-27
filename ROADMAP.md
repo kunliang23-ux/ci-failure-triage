@@ -1,7 +1,7 @@
 # CI Failure Triage roadmap
 
 The product question is: **Why did my tests fail, and what should I investigate first?**
-The 15-day plan advances in small, testable stages. Java 17 and Maven remain the backend foundation, and JUnit supplies automated tests. Days 1–6 are implemented. See [JUnit XML import](docs/JUNIT_XML_IMPORT.md), [log import](docs/LOG_IMPORT.md), [failure grouping](docs/GROUPING.md), [SQLite storage](docs/STORAGE.md), and [baseline comparison](docs/COMPARISON.md).
+The 15-day plan advances in small, testable stages. Java 17 and Maven remain the backend foundation, and JUnit supplies automated tests. Days 1–7 are implemented. See [JUnit XML import](docs/JUNIT_XML_IMPORT.md), [log import](docs/LOG_IMPORT.md), [failure grouping](docs/GROUPING.md), [SQLite storage](docs/STORAGE.md), [baseline comparison](docs/COMPARISON.md), and [GitHub import](docs/GITHUB_IMPORT.md).
 
 ## Day 1: scaffold and CLI
 
@@ -49,6 +49,13 @@ Acceptance: a local report produces accurate test outcomes and useful diagnostic
 - [x] Identify new, unseen, skipped-baseline, ambiguous, and missing test observations. Keep repeated executions and evidence available.
 - [x] Rank investigation priorities using supported build diagnostics, confirmed new failures, and distinct named tests. Keep priorities available without a compatible baseline.
 
+## Day 7: GitHub Actions job bundle import (implemented)
+
+- [x] Capture Maven output outside the clean directory and upload available JUnit XML with a versioned execution manifest. Preserve the original build status.
+- [x] Resolve a completed job in one explicit repository and one workflow attempt. Use read-only authentication, paginated results, and a scoped artifact download.
+- [x] Validate the archive and provenance before saving the original files, observations, and execution metadata transactionally. Preserve a stable run ID across reimports.
+- [x] Add mocked HTTP and archive tests and a manual controlled-failure workflow for post-push demonstration.
+
 ## Later: inconsistent repeated outcomes
 
 - Link repeated executions by test identity and compatible execution context.
@@ -69,9 +76,8 @@ Acceptance: a local report produces accurate test outcomes and useful diagnostic
 - Add Spring Boot around established services for import, run details, groups, comparisons, and explanations.
 - Define request validation, pagination, actionable errors, and tests. Keep domain logic independent of HTTP.
 
-## Later: dashboard and GitHub importing
+## Later: dashboard
 
 - Build a React and TypeScript dashboard for runs, test names, errors, commit SHAs, environments, failure groups, comparisons, and cited evidence.
 - Show unknowns and insufficient evidence clearly. Let developers trace explanations back to source lines.
-- Add GitHub run/artifact importing with explicit repository selection, credential handling, pagination, and rate-limit behavior.
 - Extend GitHub Actions checks as frontend and integration tests become relevant.

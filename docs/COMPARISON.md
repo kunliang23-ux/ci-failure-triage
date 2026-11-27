@@ -45,7 +45,7 @@ Use `--metadata <path>` with `--db` on either importer. A metadata file uses UTF
 | `CONCLUSION` | `SUCCESS`, `FAILURE`, `CANCELLED`, `TIMED_OUT`, `SKIPPED`, or `NEUTRAL`. |
 | `COMMIT`, `ATTEMPT` | Commit identifier and positive 32-bit attempt number. |
 
-Metadata can be filled across imports for the same run. A value shared by the file, a CLI flag, or saved metadata must agree exactly as text. Conflicts and impossible merged timestamps abort the import. Existing execution metadata comes from explicit inputs. Import time records when the artifact was saved and plays no part in execution chronology. See [SQLite storage](STORAGE.md).
+Metadata can be filled across imports for the same run. A value shared by the file, a CLI flag, or saved metadata must agree exactly as text. Conflicts and impossible merged timestamps abort the import. GitHub bundle imports use the producer manifest for the tested configuration and the selected job's API timestamps and conclusion. Import time records when the artifact was saved and plays no part in execution chronology. See [SQLite storage](STORAGE.md) and [GitHub import](GITHUB_IMPORT.md#import-checks-and-saved-evidence).
 
 ## Baseline eligibility
 

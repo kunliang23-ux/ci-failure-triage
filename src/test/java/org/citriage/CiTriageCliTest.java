@@ -35,6 +35,7 @@ class CiTriageCliTest {
                 () -> assertTrue(result.out().contains("--report <path>")),
                 () -> assertTrue(result.out().contains("import-junit <report-path>")),
                 () -> assertTrue(result.out().contains("import-log <log-path> [--commit <sha>] [--environment <label>]")),
+                () -> assertTrue(result.out().contains("import-github OWNER/REPO --run-id <id>")),
                 () -> assertTrue(result.out().contains("[--group]")),
                 () -> assertTrue(result.out().contains("JUnit XML")),
                 () -> assertEquals("", result.err()));
@@ -58,6 +59,35 @@ class CiTriageCliTest {
                 () -> assertEquals(0, result.exitCode()),
                 () -> assertEquals("CI Failure Triage 0.1.0" + System.lineSeparator(), result.out()),
                 () -> assertEquals("", result.err()));
+    }
+
+    @ParameterizedTest
+    @MethodSource("invalidGitHubArguments")
+    void validatesGitHubArgumentsBeforeAuthOrDatabaseAccess(String[] args, String message) {
+        Result result = invoke(args);
+        assertEquals(2, result.exitCode());
+        assertEquals("", result.out());
+        assertTrue(result.err().contains(message));
+        assertTrue(result.err().contains("--help"));
+    }
+
+    static Stream<Arguments> invalidGitHubArguments() {
+        return Stream.of(
+                Arguments.of(new String[] {"import-github"}, "OWNER/REPO"),
+                Arguments.of(new String[] {"import-github", "example/project", "--run-id", "123"}, "requires --db"),
+                Arguments.of(new String[] {"import-github", "example/project", "--db", "example.sqlite"}, "--run-id"),
+                Arguments.of(new String[] {"import-github", "http://example.invalid", "--db", "example.sqlite",
+                        "--run-id", "123"}, "OWNER/REPO"),
+                Arguments.of(new String[] {"import-github", "example/project", "--db", "example.sqlite", "--run-id",
+                        "0"}, "--run-id"),
+                Arguments.of(new String[] {"import-github", "example/project", "--db", "example.sqlite", "--run-id",
+                        "123", "--attempt", "2147483648"}, "positive 32-bit integer"),
+                Arguments.of(new String[] {"import-github", "example/project", "--db", "example.sqlite", "--run-id",
+                        "123", "--job-id", "-1"}, "--job-id"),
+                Arguments.of(new String[] {"import-github", "example/project", "--db", "example.sqlite", "--run-id",
+                        "123", "--attempt", "1", "--attempt", "2"}, "only once"),
+                Arguments.of(new String[] {"import-github", "example/project", "--db", "example.sqlite", "--run-id",
+                        "123", "--commit", "abcd"}, "Unknown import-github option"));
     }
 
     @ParameterizedTest

@@ -11,11 +11,14 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalInt;
+import java.util.OptionalLong;
 import java.util.Properties;
 import java.util.Set;
 
 import org.citriage.comparison.PriorityService;
 import org.citriage.comparison.RunComparison;
+import org.citriage.github.GitHubImporter;
 import org.citriage.log.BuildLog;
 import org.citriage.log.FailureGroup;
 import org.citriage.log.LogClassifier;
@@ -30,6 +33,7 @@ import org.citriage.report.OutcomeDetail;
 import org.citriage.report.ReportParseException;
 import org.citriage.report.TestCaseResult;
 import org.citriage.report.TestOutcome;
+import org.citriage.storage.GitHubOrigin;
 import org.citriage.storage.RunFacts;
 import org.citriage.storage.RunMetadata;
 import org.citriage.storage.RunMetadata.Field;
@@ -45,19 +49,22 @@ import static org.citriage.CliDisplay.redactHomes;
 import static org.citriage.CliDisplay.sourceName;
 import static org.citriage.CliDisplay.text;
 
-/** The command-line entry point for local CI evidence. */
+/** The command-line entry point for CI evidence. */
 public final class CiTriageCli {
     private static final String HELP = """
             CI Failure Triage
             Help developers answer: Why did my tests fail, and what should I investigate first?
 
             Import a local JUnit XML report or inspect failure diagnostics in a local UTF-8 log.
+            Import a GitHub Actions evidence bundle for one completed job.
             Save evidence to SQLite, reopen it by run ID, and compare compatible runs.
 
             Usage: java -jar target/ci-failure-triage.jar import-junit <report-path>
                          [--db <database-path> [--run-id <id>] [--metadata <path>] [--commit <sha>] [--environment <label>]]
                    java -jar target/ci-failure-triage.jar import-log <log-path> [--commit <sha>] [--environment <label>] [--group]
                          [--db <database-path> [--run-id <id>] [--metadata <path>]]
+                   java -jar target/ci-failure-triage.jar import-github OWNER/REPO --run-id <id> --db <database-path>
+                         [--attempt <number>] [--job-id <id>]
                    java -jar target/ci-failure-triage.jar runs --db <database-path>
                    java -jar target/ci-failure-triage.jar show-run <id> --db <database-path> [--group]
                    java -jar target/ci-failure-triage.jar compare-runs <current-id> --db <database-path> [--baseline <baseline-id>]
@@ -66,6 +73,7 @@ public final class CiTriageCli {
             Arguments (choose one operation):
               import-junit <report-path>  Import one local JUnit XML report.
               import-log <log-path>       Import one local UTF-8 log.
+              import-github OWNER/REPO    Save a GitHub Actions job bundle using GITHUB_TOKEN.
               runs                       List saved runs.
               show-run <id>               Show saved results and evidence for a run.
               compare-runs <current-id>   Compare with a compatible earlier run and prioritize investigation.
@@ -74,13 +82,14 @@ public final class CiTriageCli {
               --report <path>             Compatibility alias for import-junit.
 
             Supply each import option at most once after the source path.
-            --db saves an import. Omit --run-id to create a fresh run ID.
+            --db saves a local import. Omit --run-id on local imports to create a fresh run ID.
+            import-github requires the external --run-id and uses the latest attempt unless --attempt is supplied.
             --metadata <path> reads explicit execution metadata for a saved import.
             Use --group to group similar diagnostics and show every member's evidence.
             Omitted commit and environment values are displayed as unknown.
             Quote paths and environment labels containing spaces.
             With no arguments, show help.
-            Exit codes: 0 = success, 1 = file, parsing, database, or missing-run error, 2 = invalid arguments.
+            Exit codes: 0 = success, 1 = API, file, parsing, database, or missing-run error, 2 = invalid arguments.
             Successful imports return 0 even when they contain failure diagnostics.
             """;
 
@@ -98,6 +107,7 @@ public final class CiTriageCli {
                 switch (args[0]) {
                     case "import-log": return importLog(args, out, err);
                     case "import-junit", "--report": return importReport(args, out, err);
+                    case "import-github": return importGitHub(args, out);
                     case "runs": return listRuns(args, out);
                     case "show-run": return showRun(args, out);
                     case "compare-runs": return compareRuns(args, out);
@@ -119,14 +129,14 @@ public final class CiTriageCli {
             if (!"--help".equals(argument) && !"--version".equals(argument)
                     && !"--report".equals(argument) && !"import-junit".equals(argument)
                     && !"import-log".equals(argument) && !"runs".equals(argument) && !"show-run".equals(argument)
-                    && !"compare-runs".equals(argument)) {
+                    && !"compare-runs".equals(argument) && !"import-github".equals(argument)) {
                 return argumentError(err, "Unknown argument: '" + argument + "'.");
             }
         }
 
         if (args.length > 1) {
             return argumentError(err,
-                    "Choose only one argument: --help, --version, import-junit, --report, import-log, runs, show-run, or compare-runs.");
+                    "Choose only one argument: --help, --version, import-junit, --report, import-log, import-github, runs, show-run, or compare-runs.");
         }
 
         if (args.length == 0 || "--help".equals(args[0])) {
@@ -304,6 +314,69 @@ public final class CiTriageCli {
         }
     }
 
+    private static int importGitHub(String[] args, PrintStream out) throws IOException, SQLException {
+        if (args.length < 2 || missingValue(args[1])) {
+            throw new UsageException("import-github requires a repository in OWNER/REPO form.");
+        }
+        Map<String, String> options = parseOptions(args, 2, "--db", "--run-id", "--attempt", "--job-id");
+        Path database = requiredDatabase(args[0], options);
+        GitHubImporter.Request request;
+        try {
+            long runId = positiveId(options.get("--run-id"), "--run-id");
+            String attempt = options.get("--attempt");
+            String job = options.get("--job-id");
+            request = new GitHubImporter.Request(args[1], runId,
+                    attempt == null ? OptionalInt.empty() : OptionalInt.of(Math.toIntExact(positiveId(attempt, "--attempt"))),
+                    job == null ? OptionalLong.empty() : OptionalLong.of(positiveId(job, "--job-id")));
+        } catch (ArithmeticException exception) {
+            throw new UsageException("--attempt requires a positive 32-bit integer.");
+        } catch (IllegalArgumentException exception) {
+            throw new UsageException(exception.getMessage());
+        }
+        GitHubImporter.Result result = GitHubImporter.importBundle(request, database, System.getenv("GITHUB_TOKEN"));
+        out.println("Run ID: " + result.saved().runId());
+        printGitHubOrigin(result.origin(), out);
+        out.println(result.saved().inserted() ? "Storage: bundle saved." : "Storage: bundle already saved.");
+        out.println("Job conclusion: " + displayMetadata(result.metadata().value(Field.CONCLUSION)));
+        out.println("Tested commit: " + displayMetadata(result.metadata().value(Field.COMMIT)));
+        printGitHubEvidenceSummary(result.reports(), result.findings(), result.groups(), out);
+        return 0;
+    }
+
+    private static long positiveId(String value, String option) {
+        if (value != null && value.matches("[0-9]{1,19}")) {
+            try {
+                long id = Long.parseLong(value);
+                if (id > 0) {
+                    return id;
+                }
+            } catch (NumberFormatException ignored) {
+                // Return a usage error without echoing the argument.
+            }
+        }
+        throw new UsageException("import-github requires a positive integer for " + option + ".");
+    }
+
+    private static void printGitHubOrigin(GitHubOrigin origin, PrintStream out) {
+        out.println("GitHub repository: " + text(origin.repository()) + " (ID " + origin.repositoryId() + ")");
+        out.printf("GitHub run ID: %d | Attempt: %d | Job ID: %d | Artifact ID: %d%n",
+                origin.workflowRunId(), origin.attempt(), origin.jobId(), origin.artifactId());
+        out.println("Triggering head commit: " + displayMetadata(origin.triggeringHeadCommit()));
+    }
+
+    private static void printGitHubEvidenceSummary(int reports, Optional<Integer> findings, Optional<Integer> groups,
+                                                    PrintStream out) {
+        out.println("JUnit reports in bundle: " + reports);
+        if (reports == 0) {
+            out.println("JUnit evidence unavailable: no JUnit report was included.");
+        }
+        if (findings.isPresent()) {
+            out.printf("Build log findings: %d | Groups: %d%n", findings.get(), groups.orElseThrow());
+        } else {
+            out.println("Build log evidence unavailable: no build log was included.");
+        }
+    }
+
     private static int listRuns(String[] args, PrintStream out) throws SQLException {
         Map<String, String> options = parseOptions(args, 1, "--db");
         List<RunSummary> runs = new SqliteRunRepository(requiredDatabase(args[0], options)).listRuns();
@@ -327,6 +400,13 @@ public final class CiTriageCli {
                 .orElseThrow(() -> new SQLException("Run '" + id + "' does not exist."));
         out.println("Run ID: " + text(run.id()));
         out.println("First imported: " + run.firstImportedAt());
+        run.githubOrigin().ifPresent(origin -> {
+            printGitHubOrigin(origin, out);
+            out.println("Manifest SHA-256: " + origin.manifest().sha256());
+            if (run.reports().isEmpty()) {
+                out.println("JUnit evidence unavailable: no JUnit report was included.");
+            }
+        });
         for (Field field : Field.values()) {
             out.println(field.label() + ": " + displayMetadata(run.metadata().value(field)));
         }

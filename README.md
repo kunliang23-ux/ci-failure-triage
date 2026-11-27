@@ -4,16 +4,18 @@ A Java portfolio project to help developers answer:
 
 > Why did my tests fail, and what should I investigate first?
 
-**Days 1–6 of the 15-day plan are implemented.** The CLI saves local JUnit and log evidence in SQLite, compares runs with eligible earlier baselines, and explains which current failures to investigate first. Saved runs retain original source bytes and numbered log evidence. GitHub Actions builds and tests on pushes and pull requests. See the [XML input contract](docs/JUNIT_XML_IMPORT.md), [log import contract](docs/LOG_IMPORT.md), [grouping rules](docs/GROUPING.md), [storage contract](docs/STORAGE.md), [baseline comparison](docs/COMPARISON.md), and [roadmap](ROADMAP.md).
+**Days 1–7 of the 15-day plan are implemented.** The CLI saves local JUnit, log, and GitHub Actions job evidence in SQLite, compares runs with eligible earlier baselines, and explains which current failures to investigate first. Saved runs retain original source bytes and numbered log evidence. See the [XML input contract](docs/JUNIT_XML_IMPORT.md), [log import contract](docs/LOG_IMPORT.md), [grouping rules](docs/GROUPING.md), [storage contract](docs/STORAGE.md), [baseline comparison](docs/COMPARISON.md), [GitHub import](docs/GITHUB_IMPORT.md), and [roadmap](ROADMAP.md).
 
 ## Requirements and versions
 
 - JDK 17, including `java` and `javac`.
 - Apache Maven 3.9.x or a newer stable Maven 3 release; the local setup below uses 3.9.16.
 - Git for source control and a GitHub account for publishing.
-- Internet access for the first Maven dependency download. The built CLI itself works offline.
+- Internet access for the first Maven dependency download and for `import-github`. Local imports and queries work offline.
 
 `pom.xml` targets Java 17 with `maven.compiler.release`. JUnit Jupiter 5.13.4 is test-only. Xerial SQLite JDBC 3.54.1.0 supplies the runtime driver. Maven Shade 3.6.2 bundles it in the executable JAR. The other build plugins are pinned to Clean 3.4.1, Resources 3.3.1, Compiler 3.14.1, Surefire 3.5.4, and JAR 3.4.2. See the [SQLite JDBC release](https://github.com/xerial/sqlite-jdbc/releases/tag/3.54.1.0), [Maven Shade requirements](https://maven.apache.org/plugins-archives/maven-shade-plugin-3.6.2/plugin-info.html), and [JUnit release notes](https://docs.junit.org/5.13.4/release-notes/).
+
+The GitHub importer uses Java 17 HTTP, Gson 2.14.0 for JSON, and Apache Commons Compress 1.28.0 for ZIP entry types and bounded evidence extraction. Both libraries are bundled in the executable JAR. [Gson release](https://github.com/google/gson/releases/tag/gson-parent-2.14.0) · [Commons Compress release notes](https://commons.apache.org/proper/commons-compress/changes.html)
 
 ## Windows PowerShell setup
 
@@ -176,6 +178,12 @@ With Java 17 and Maven 3.9.16, `mvn test` and `mvn clean verify` each passed 183
 
 With Java 17 and Maven 3.9.16, `mvn test` and `mvn clean verify` each passed 230 tests. The clean build used an isolated copy of the source to preserve the main checkout's existing build-directory data. Twenty-six packaged command checks covered automatic and explicit selection, incompatible and missing metadata, priorities without a baseline, read-only comparison after removing temporary sources, and version 1 reads and migration. Five compatibility checks matched the Day 5 JAR's output and exit codes byte for byte. Build logs and captures are in ignored `.tools/day6-validation/`.
 
+## Day 7 validation results
+
+With Java 17 and Maven 3.9.16, `mvn test` and `mvn clean verify` each passed 284 tests. The clean build ran in an isolated copy to preserve the checkout's existing `target/` data. Twenty-five packaged checks verified exit codes, output streams, local command compatibility, and reopening saved GitHub evidence. Nine matched the previous JAR byte for byte. Both workflow files passed Actionlint.
+
+Local Maven producer runs preserved exit codes `0` and `1` and produced 13 and 14 JUnit reports respectively. Both bundles imported through a mocked GitHub client, reopened with the expected outcomes, and reimported without duplicates. The live upload and import demonstration requires the updated workflows and an Actions read token. Validation captures are in ignored `.tools/day7-validation/`.
+
 ## CLI behavior
 
 | Arguments | Standard output | Standard error | Exit code |
@@ -189,6 +197,7 @@ With Java 17 and Maven 3.9.16, `mvn test` and `mvn clean verify` each passed 230
 | `import-log <log-path> --group` with optional metadata flags | Source and metadata, finding and group totals, representative diagnostics, test identities, and all numbered member evidence | Empty | `0`, even with failure findings |
 | `import-log <log-path>` with an unreadable file or invalid UTF-8 | Empty | Read or decoding diagnostic | `1` |
 | `import-junit <path> --db <database-path>` or `import-log <path> --db <database-path>` | Run ID, save status, and the imported results. Supply `--run-id <id>` to attach to a specific execution. | Empty | `0` |
+| `import-github OWNER/REPO --run-id <id> --db <database-path> [--attempt <number>] [--job-id <id>]` | Local run ID, separate GitHub identifiers, job conclusion, and bundle status | Empty on success. API, bundle, parsing, or database diagnosis otherwise. | `0` on success, `1` on import failure, `2` on invalid arguments |
 | `runs --db <database-path>` | Saved run IDs, import times, metadata, and separate XML and log totals | Empty | `0` |
 | `show-run <id> --db <database-path> [--group]` | Stored metadata, JUnit outcomes, and original log evidence | Empty | `0` |
 | `compare-runs <current-id> --db <database-path> [--baseline <baseline-id>]` | Baseline selection or exclusion reasons, JUnit comparisons, and priorities with evidence. | Empty | `0`, including comparison unavailable |
@@ -266,6 +275,19 @@ java -jar target/ci-failure-triage.jar compare-runs current --db $db
 
 The comparison selects `baseline` and shows A as a new failure, D as an unseen failing test, and C as unobserved now. Supply `--baseline baseline` to request that run explicitly. The report explains any incompatibility and still lists current evidence priorities when comparison is unavailable. See the [metadata format, eligibility rules, and additional demos](docs/COMPARISON.md).
 
+## Import a GitHub Actions job
+
+Use an Actions read-only token scoped to the selected repository and a completed run that uploaded a triage bundle. Replace `OWNER/REPO` and `RUN_ID` before running this command.
+
+```powershell
+New-Item -ItemType Directory -Force -Path 'data' | Out-Null
+java -jar target/ci-failure-triage.jar import-github OWNER/REPO --run-id RUN_ID --db data/triage.sqlite
+java -jar target/ci-failure-triage.jar runs --db data/triage.sqlite
+java -jar target/ci-failure-triage.jar show-run LOCAL_RUN_ID --db data/triage.sqlite --group
+```
+
+The command reads `GITHUB_TOKEN` and prints the saved local run ID. Use that ID for `show-run`. Supply `--attempt <number>` for an earlier attempt and `--job-id <id>` to select a job when the attempt has multiple jobs. The importer validates the bundle, stores it transactionally, and reports when the same execution is already present. A failed job can be imported even when its only evidence is a log. See the [bundle contract and real-run demonstration](docs/GITHUB_IMPORT.md).
+
 ## GitHub Actions CI
 
 `.github/workflows/ci.yml` runs on pushes and pull requests, uses Temurin JDK 17 on `ubuntu-latest`, caches Maven dependencies, and runs exactly:
@@ -274,7 +296,7 @@ The comparison selects `baseline` and shows A as a new failure, D as an unseen f
 mvn --batch-mode clean verify
 ```
 
-Actions are pinned to the verified release commits of [Checkout v7.0.1](https://github.com/actions/checkout/releases/tag/v7.0.1) and [Setup Java v6.3.0](https://github.com/actions/setup-java/releases/tag/v6.3.0), checked on November 17, 2026. The workflow has read-only repository contents permission. Report fixtures describe failures as data; their parser assertions keep normal CI passing. GitHub-hosted execution is available after the workflow is pushed.
+The workflow captures Maven output and uploads available JUnit XML and a versioned manifest, including after Maven fails. Its repository contents permission is read-only. The separate `ci-controlled-failure.yml` workflow runs on manual dispatch and adds one deliberately failing test for demonstration. A GitHub-hosted run of the updated workflow is available after push. Actions use the verified release commits of [Checkout v7.0.1](https://github.com/actions/checkout/releases/tag/v7.0.1), [Setup Java v6.3.0](https://github.com/actions/setup-java/releases/tag/v6.3.0), and [Upload Artifact v7.0.2](https://github.com/actions/upload-artifact/commit/cf430e030ddbb5b0abf93d22962f4752f3646cd9).
 
 ## Files and execution flow
 
@@ -288,6 +310,7 @@ Actions are pinned to the verified release commits of [Checkout v7.0.1](https://
 | `src/main/java/org/citriage/log/` | UTF-8 reader, numbered evidence, classifier, and immutable diagnostic groups. |
 | `src/main/java/org/citriage/storage/` | SQLite repository, schema migration loader, saved run models, and observation mapping. |
 | `src/main/java/org/citriage/comparison/` | Baseline selection, test matching, and investigation priority rules. |
+| `src/main/java/org/citriage/github/` | GitHub REST client, bundle validation, and import service. |
 | `src/main/resources/db/migrations/` | Ordered SQLite schema migrations. |
 | `src/main/resources/ci-triage.properties` | Version template; Maven replaces `${project.version}` with the POM version. |
 | `src/test/java/org/citriage/CiTriageCliTest.java` | JUnit tests for output streams, exit codes, no arguments, and invalid combinations. |
@@ -299,11 +322,13 @@ Actions are pinned to the verified release commits of [Checkout v7.0.1](https://
 | `src/test/resources/fixtures/comparison/` | Example baseline and current executions, explicit metadata, and current log evidence. |
 | `src/test/resources/junit/` | Unchanged earlier fixtures retained for regression coverage. |
 | `.github/workflows/ci.yml` | JDK 17 Maven checks on pushes and pull requests. |
+| `.github/scripts/triage-bundle.py` | Captures build output, observed metadata, and report inventory for Actions. |
 | `docs/JUNIT_XML_IMPORT.md` | The supported input format, outcome models, evidence semantics, and API example. |
 | `docs/LOG_IMPORT.md` | Log import options, evidence conventions, and classification rules. |
 | `docs/GROUPING.md` | Grouping options, signature normalization, and fixture expectations. |
 | `docs/STORAGE.md` | Storage commands, run identity, migrations, and evidence semantics. |
 | `docs/COMPARISON.md` | Metadata format, compatible baseline policy, comparison outcomes, and priorities. |
+| `docs/GITHUB_IMPORT.md` | Bundle format, GitHub selection, credentials, metadata, and post-push demonstration. |
 | `.gitignore` | Excludes build output, local tools, credentials, SQLite files, and editor/OS temporary files. Deliberately allows sanitized `.log` fixtures. |
 | `AGENTS.md` | Future Codex instructions about scope, existing work, evidence, checks, and handoffs. |
 | `ROADMAP.md` | Later implementation stages and their boundaries. |
@@ -321,6 +346,8 @@ With `--db`, the CLI saves the accepted import through `SqliteRunRepository` bef
 
 `compare-runs` evaluates candidate metadata and stored outcome counts in one read-only snapshot. It loads the current and selected runs for evidence-backed comparison and ranking.
 
+`import-github` resolves the completed job, checks the archive and its declared provenance, and reuses the local parsers and grouping rules. It saves the selected bundle and GitHub origin in one transaction.
+
 `.tools/` contains ignored local tooling/cache files when the portable setup is used. `target/` contains generated files, including the executable JAR. Neither belongs in the source commit.
 
 ## Commit and push to GitHub
@@ -330,10 +357,10 @@ Use the checkout's existing `origin` remote. Verify its URL with `git remote -v`
 ```powershell
 # Review the files and stage only project sources/documentation.
 git status --short
-git add src docs README.md AGENTS.md ROADMAP.md pom.xml
+git add src docs .github README.md AGENTS.md ROADMAP.md pom.xml .gitignore
 git diff --cached --check
 git diff --cached
-git commit -m "Compare compatible CI runs and prioritize investigations"
+git commit -m "Import GitHub Actions job evidence"
 
 # Verify the existing destination.
 git remote -v

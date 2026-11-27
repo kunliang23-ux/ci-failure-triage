@@ -19,7 +19,8 @@ import org.sqlite.SQLiteConfig;
 final class SqliteDatabase {
     private static final int APPLICATION_ID = 0x43495452;
     private static final List<String> MIGRATIONS = List.of("/db/migrations/V001__create_storage.sql",
-            "/db/migrations/V002__execution_completion_metadata.sql");
+            "/db/migrations/V002__execution_completion_metadata.sql",
+            "/db/migrations/V003__github_bundle_origin.sql");
 
     private final Path path;
 
@@ -66,7 +67,7 @@ final class SqliteDatabase {
     }
 
     private static void prepareSchema(Connection connection, boolean writable) throws SQLException {
-        int version = intPragma(connection, "PRAGMA user_version");
+        int version = schemaVersion(connection);
         if (version < 0 || version > MIGRATIONS.size()) {
             throw new SQLException("Unsupported database schema version " + version
                     + " (supported through " + MIGRATIONS.size() + ").");
@@ -84,7 +85,7 @@ final class SqliteDatabase {
             if (version == 0) {
                 throw new SQLException("Database has no CI Failure Triage schema. Save an import first.");
             }
-            // Versions 1 and 2 share the same read schema. Version 2 adds allowed metadata keys.
+            // Older schemas still support local observations without GitHub provenance.
             return;
         }
         for (int i = version; i < MIGRATIONS.size(); i++) {
@@ -122,6 +123,10 @@ final class SqliteDatabase {
             }
             return rows.getInt(1);
         }
+    }
+
+    static int schemaVersion(Connection connection) throws SQLException {
+        return intPragma(connection, "PRAGMA user_version");
     }
 
     private static void execute(Connection connection, String sql) throws SQLException {

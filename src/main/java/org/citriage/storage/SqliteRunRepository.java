@@ -42,6 +42,39 @@ public final class SqliteRunRepository {
                 (connection, sourceId) -> StoredLog.write(connection, sourceId, log, findings, groups));
     }
 
+    /** Commits an already validated bundle, its provenance and all observations as one unit. */
+    public SaveResult saveGitHubBundle(GitHubOrigin origin, RunMetadata metadata, List<JUnitReport> reports,
+                                       Optional<LogObservations> log) throws SQLException {
+        return database.transaction(true, connection -> {
+            String id = origin.localRunId();
+            Optional<GitHubOrigin> stored = StoredGitHub.read(connection, id);
+            if (stored.isPresent()) {
+                if (!stored.get().matches(origin)) {
+                    throw new SQLException("Conflicting GitHub bundle provenance for run '" + id + "'.");
+                }
+                storeMetadata(connection, id, metadata);
+                return new SaveResult(id, false);
+            }
+            long importedAt = Instant.now().toEpochMilli();
+            if (!insertRun(connection, id, importedAt)) {
+                throw new SQLException("The local run ID '" + id + "' already belongs to a different import.");
+            }
+            storeMetadata(connection, id, metadata);
+            StoredGitHub.write(connection, origin);
+            for (JUnitReport report : reports) {
+                saveSource(connection, id, importedAt, Kind.JUNIT_XML, report.source(),
+                        (db, sourceId) -> StoredJUnit.write(db, sourceId, report));
+            }
+            if (log.isPresent()) {
+                LogObservations evidence = log.get();
+                saveSource(connection, id, importedAt, Kind.LOG, evidence.log().source(),
+                        (db, sourceId) -> StoredLog.write(db, sourceId, evidence.log(), evidence.findings(),
+                                evidence.groups()));
+            }
+            return new SaveResult(id, true);
+        });
+    }
+
     public List<RunSummary> listRuns() throws SQLException {
         return database.transaction(false, connection -> {
             List<RunSummary> runs = new ArrayList<>();
@@ -144,44 +177,59 @@ public final class SqliteRunRepository {
         return database.transaction(true, connection -> {
             long importedAt = Instant.now().toEpochMilli();
             String runId = ensureRun(connection, requestedId, importedAt);
-            storeMetadata(connection, runId, metadata);
-            long sourceId;
-            try (PreparedStatement statement = connection.prepareStatement("""
-                    INSERT INTO sources (run_id, kind, original_path, sha256, original_bytes, imported_at_ms)
-                    VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT (run_id, kind, sha256) DO NOTHING RETURNING source_id
-                    """)) {
-                statement.setString(1, runId);
-                statement.setString(2, kind.name());
-                statement.setString(3, source.name());
-                statement.setString(4, source.sha256());
-                statement.setBytes(5, source.bytes());
-                statement.setLong(6, importedAt);
-                try (ResultSet rows = statement.executeQuery()) {
-                    if (!rows.next()) {
-                        return new SaveResult(runId, false);
-                    }
-                    sourceId = rows.getLong(1);
-                }
+            if (runId.startsWith("github-") && StoredGitHub.read(connection, runId).isPresent()) {
+                throw new SQLException("Use import-github to import the bundle for run '" + runId + "'.");
             }
-            writer.write(connection, sourceId);
-            return new SaveResult(runId, true);
+            storeMetadata(connection, runId, metadata);
+            return new SaveResult(runId, saveSource(connection, runId, importedAt, kind, source, writer));
         });
+    }
+
+    private static boolean saveSource(Connection connection, String runId, long importedAt, Kind kind,
+                                      ReportSource source, SourceWriter writer) throws SQLException {
+        long sourceId;
+        try (PreparedStatement statement = connection.prepareStatement("""
+                INSERT INTO sources (run_id, kind, original_path, sha256, original_bytes, imported_at_ms)
+                VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT (run_id, kind, sha256) DO NOTHING RETURNING source_id
+                """)) {
+            statement.setString(1, runId);
+            statement.setString(2, kind.name());
+            statement.setString(3, source.name());
+            statement.setString(4, source.sha256());
+            statement.setBytes(5, source.bytes());
+            statement.setLong(6, importedAt);
+            try (ResultSet rows = statement.executeQuery()) {
+                if (!rows.next()) {
+                    return false;
+                }
+                sourceId = rows.getLong(1);
+            }
+        }
+        writer.write(connection, sourceId);
+        return true;
     }
 
     private static String ensureRun(Connection connection, Optional<String> requestedId, long importedAt)
             throws SQLException {
+        if (requestedId.isPresent()) {
+            String id = requestedId.get();
+            insertRun(connection, id, importedAt);
+            return id;
+        }
+        String id;
+        do {
+            id = UUID.randomUUID().toString();
+        } while (!insertRun(connection, id, importedAt));
+        return id;
+    }
+
+    private static boolean insertRun(Connection connection, String id, long importedAt) throws SQLException {
         try (PreparedStatement statement = connection.prepareStatement("""
                 INSERT INTO runs (run_id, first_imported_at_ms) VALUES (?, ?) ON CONFLICT (run_id) DO NOTHING
                 """)) {
             statement.setLong(2, importedAt);
-            String id;
-            int inserted;
-            do {
-                id = requestedId.orElseGet(() -> UUID.randomUUID().toString());
-                statement.setString(1, id);
-                inserted = statement.executeUpdate();
-            } while (inserted == 0 && requestedId.isEmpty());
-            return id;
+            statement.setString(1, id);
+            return statement.executeUpdate() != 0;
         }
     }
 
@@ -236,7 +284,7 @@ public final class SqliteRunRepository {
         } catch (CharacterCodingException | IllegalArgumentException exception) {
             throw new SQLException("Invalid saved observation for run '" + id + "'.", exception);
         }
-        return new SavedRun(id, firstImportedAt, metadata, reports, logs);
+        return new SavedRun(id, firstImportedAt, metadata, reports, logs, StoredGitHub.read(connection, id));
     }
 
     private static RunMetadata readMetadata(Connection connection, String id) throws SQLException {
@@ -256,6 +304,13 @@ public final class SqliteRunRepository {
     }
 
     public record SaveResult(String runId, boolean inserted) {
+    }
+
+    public record LogObservations(BuildLog log, List<LogFinding> findings, List<FailureGroup> groups) {
+        public LogObservations {
+            findings = List.copyOf(findings);
+            groups = List.copyOf(groups);
+        }
     }
 
     public record RunSummary(String id, Instant firstImportedAt, Optional<String> commit, Optional<String> environment,

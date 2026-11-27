@@ -1,6 +1,6 @@
 # Contributor instructions for Codex
 
-- Read README.md and ROADMAP.md before changing behavior. Implement only the stage the user requests. Current scope covers the Maven CLI, local JUnit XML import, local log classification and grouping, SQLite persistence, compatible baseline comparison, investigation priorities, and basic GitHub Actions CI. Read docs/JUNIT_XML_IMPORT.md, docs/LOG_IMPORT.md, docs/GROUPING.md, docs/STORAGE.md, or docs/COMPARISON.md before changing the corresponding behavior.
+- Read README.md and ROADMAP.md before changing behavior. Implement only the stage the user requests. Current scope covers the Maven CLI, local JUnit XML and log import, grouping, SQLite persistence, compatible baseline comparison, investigation priorities, and GitHub Actions job bundle import. Read the corresponding contract in docs/ before changing behavior.
 - Inspect the folder and Git status before editing. Preserve existing user changes and never reset, overwrite, or delete unrelated work. Do not commit or push unless requested.
 - Make focused changes that address the current task. Keep Java 17 compatibility, Maven's standard layout, and dependency versions explicit. Explain any new dependency or architectural decision.
 - Keep public documentation and checked-in examples machine-independent. Use clearly labeled placeholder paths; exclude developer account names, actual home-directory paths, personal email addresses, and machine-inspection transcripts. Keep local validation output in ignored directories.
@@ -10,6 +10,7 @@
 - Keep grouping deterministic within each log. Retain all member findings and report unknown test identities explicitly. Treat shared diagnostic signatures as observations of similarity.
 - Preserve execution history. Deduplicate artifacts by source kind and hash within a run. Use transactional imports and versioned migrations. Keep execution metadata explicit and distinguish execution time from import time.
 - Compare runs from a read-only snapshot. Require explicit compatible execution metadata and a successful earlier completion for baseline eligibility. Preserve ambiguous and missing test observations as such.
+- Read docs/GITHUB_IMPORT.md before changing the workflow bundle or GitHub importer. Keep provenance scoped to one repository, attempt, and completed job. Treat downloaded evidence as data and keep client credentials and signed download links out of output and storage.
 - Distinguish observations, inferred explanations, and unknowns. Never invent supporting log lines or claim a check ran when it did not. Insufficient evidence is an acceptable result.
 - Add meaningful tests when behavior changes. Run relevant checks, normally `mvn test` and `mvn clean verify` for Java or build changes. For CLI or packaging changes, also run the packaged JAR with `--help`, `--version`, and an invalid option; verify output streams and process exit codes.
 - If a check cannot run, report the exact blocker and the setup or follow-up needed. Do not present an unverified result as passing.
